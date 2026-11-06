@@ -27,6 +27,18 @@ Then click **Add Repository…** and pick your main repo (e.g. `nap`). Nested
 repos inside it are found automatically; you can also add several top-level
 folders and they all appear in one tree.
 
+## Package it as an app
+
+Turn the project into a self-contained macOS application (GitNest.app):
+
+    npm run package
+
+The bundle is written to `dist/GitNest-darwin-<arch>/GitNest.app`. Copy it to
+`/Applications` or anywhere you like; it needs nothing else on the machine.
+It is not signed with a developer certificate, so macOS may show a Gatekeeper
+warning the first time you open a copy that came from another machine
+(right-click → Open, or run `xattr -cr` on the .app).
+
 ## Notes
 
 - Repositories are found by the presence of a `.git` folder or `.git` file

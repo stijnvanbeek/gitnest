@@ -5,11 +5,13 @@
   "description": "Git frontend that shows nested repositories as a tree",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "package": "electron-packager . GitNest --platform=darwin --arch=$([ \"$(uname -m)\" = x86_64 ] && echo x64 || echo arm64) --overwrite --prune --out=dist"
   },
   "author": "Stijn",
   "license": "MIT",
   "devDependencies": {
+    "@electron/packager": "^20.3.0",
     "electron": "^33.0.0"
   },
   "allowScripts": {
