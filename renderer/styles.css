@@ -161,7 +161,7 @@ section { display: flex; flex-direction: column; min-height: 0; }
 
 .dirty-badge {
   margin-left: auto;
-  background: var(--red);
+  background: var(--orange);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
