@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'">
+  <title>GitNest</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header id="toolbar">
+    <div id="app-title">GitNest</div>
+    <button id="btn-add">Add Repository…</button>
+    <button id="btn-refresh" title="Re-scan and refresh all statuses">Refresh</button>
+    <span id="scan-indicator"></span>
+    <span class="spacer"></span>
+    <button id="btn-settings" title="Settings">Settings</button>
+    <button id="btn-remove-root" title="Remove the root of the selected repo from the list">Remove Root</button>
+  </header>
+
+  <main id="layout">
+    <section id="tree-pane">
+      <div class="pane-header">Repositories</div>
+      <div id="tree"></div>
+      <div id="hsplit-tree"></div>
+      <div id="oplog-pane">
+        <div class="pane-header">Git log</div>
+        <div id="oplog-list"></div>
+      </div>
+    </section>
+
+    <div class="vsplit" id="split-tree"></div>
+
+    <section id="status-pane">
+      <div class="pane-header">Staged</div>
+      <div id="status-empty" class="pane-empty">Select a repository in the tree.</div>
+      <div id="status-content" hidden>
+        <div id="repo-header">
+          <div id="repo-name"></div>
+          <div id="repo-branch"></div>
+          <div id="repo-actions">
+            <button id="btn-fetch">Fetch</button>
+            <button id="btn-pull">Pull</button>
+            <button id="btn-push">Push</button>
+          </div>
+          <div id="branch-bar">
+            <select id="branch-select" title="Current branch"></select>
+            <button id="btn-checkout" title="Check out the selected branch">Checkout</button>
+            <button id="btn-new-branch" title="Create a new branch and check it out">New…</button>
+            <button id="btn-delete-branch" title="Delete the selected branch (local only)">Delete</button>
+            <button id="btn-merge" title="Merge the selected branch into the current one">Merge</button>
+            <input id="branch-name" placeholder="new branch name" hidden>
+          </div>
+        </div>
+        <div id="changes-list"></div>
+        <div id="selection-info"></div>
+        <div id="commit-area">
+          <textarea id="commit-message" placeholder="Commit message (first line = subject)"></textarea>
+          <div id="commit-btns">
+            <button id="btn-revert" title="Discard the selected (staged) changes: tracked files go back to HEAD, untracked files are deleted">Revert</button>
+            <button id="btn-commit" class="primary">Commit</button>
+          </div>
+        </div>
+        <div id="action-result"></div>
+      </div>
+    </section>
+
+    <div class="vsplit" id="split-status"></div>
+
+    <section id="history-pane">
+      <div class="pane-header">History</div>
+      <div id="history-empty" class="pane-empty">Select a repository to see its history.</div>
+      <div id="history-content" hidden>
+        <div id="log-list"></div>
+        <div id="hsplit"></div>
+        <div id="diff-pane">
+          <div id="diff-header"></div>
+          <pre id="diff-output"></pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="settings-modal" hidden>
+    <div id="settings-box">
+      <div id="settings-title">Settings</div>
+      <div class="settings-row">Editor for opening files: <span id="settings-editor"></span></div>
+      <div class="settings-btns">
+        <button id="btn-pick-editor">Choose application…</button>
+        <button id="btn-default-editor">Use default</button>
+        <button id="btn-close-settings">Close</button>
+      </div>
+      <div class="settings-hint">
+        Double-click a file in the tree or in the changes list to open it in this editor.
+        "Use default" opens files with the operating system's default application.
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
