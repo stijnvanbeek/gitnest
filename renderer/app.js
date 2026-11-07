@@ -604,32 +604,46 @@ function renderLog() {
 
 // ---------- global refresh ----------
 
+// Overlap guard: a refresh that is still running is never started again,
+// no matter whether it came from the button or the auto-refresh timer.
+let refreshing = false;
+
 async function refreshCounts() {
   const statuses = await api.statuses(state.repoPaths);
   state.statuses = statuses;
   renderTree();
 }
 
-async function fullRefresh({ keepSelection = true } = {}) {
-  $('scan-indicator').textContent = 'Scanning…';
-  const tree = await api.scan();
-  state.tree = Array.isArray(tree) ? tree : [];
-  state.repoPaths = [];
-  collectRepoPaths(state.tree, state.repoPaths);
-  await refreshCounts();
-  $('scan-indicator').textContent = '';
-  if (keepSelection && state.selected && state.repoPaths.includes(state.selected)) {
-    await Promise.all([refreshStatus(), refreshLog(), refreshBranches()]);
-  } else if (state.selected && !state.repoPaths.includes(state.selected)) {
-    state.selected = null;
-    $('status-empty').hidden = false;
-    $('status-content').hidden = true;
-    $('history-empty').hidden = false;
-    $('history-content').hidden = true;
+async function fullRefresh({ keepSelection = true, showIndicator = true } = {}) {
+  if (refreshing) return;
+  refreshing = true;
+  try {
+    if (showIndicator) $('scan-indicator').textContent = 'Scanning…';
+    const tree = await api.scan();
+    state.tree = Array.isArray(tree) ? tree : [];
+    state.repoPaths = [];
+    collectRepoPaths(state.tree, state.repoPaths);
+    await refreshCounts();
+    if (showIndicator) $('scan-indicator').textContent = '';
+    if (keepSelection && state.selected && state.repoPaths.includes(state.selected)) {
+      await Promise.all([refreshStatus(), refreshLog(), refreshBranches()]);
+    } else if (state.selected && !state.repoPaths.includes(state.selected)) {
+      state.selected = null;
+      $('status-empty').hidden = false;
+      $('status-content').hidden = true;
+      $('history-empty').hidden = false;
+      $('history-content').hidden = true;
+    }
+    if (!state.tree.length) showTreeHint();
+    else renderTree();
+  } finally {
+    refreshing = false;
   }
-  if (!state.tree.length) showTreeHint();
-  else renderTree();
 }
+
+// Background refresh: everything the Refresh button does, every 5 seconds,
+// silently (no "Scanning…" indicator) and never overlapping a running one.
+setInterval(() => { fullRefresh({ showIndicator: false }); }, 5000);
 
 // ---------- repo actions ----------
 
