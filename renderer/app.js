@@ -174,12 +174,20 @@ async function showFileDiff() {
 // ---------- file trees ----------
 
 function buildFileTree(paths) {
-  const root = { dirs: {}, files: [] };
+  // Prototype-less dirs: a real file or folder named "constructor" or
+  // "__proto__" would otherwise resolve to an Object.prototype member and
+  // crash the build (node.files undefined).
+  const root = { dirs: Object.create(null), files: [] };
   for (const p of paths) {
+    if (typeof p !== 'string' || !p) continue;
     const parts = p.split('/');
     let node = root;
     for (let i = 0; i < parts.length - 1; i++) {
-      node = node.dirs[parts[i]] || (node.dirs[parts[i]] = { dirs: {}, files: [] });
+      let child = node.dirs[parts[i]];
+      if (!child || typeof child !== 'object') {
+        child = node.dirs[parts[i]] = { dirs: Object.create(null), files: [] };
+      }
+      node = child;
     }
     node.files.push(parts[parts.length - 1]);
   }
