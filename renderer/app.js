@@ -292,19 +292,20 @@ function renderTreeNodes(container, nodes, depth) {
         return;
       }
       if (node.isRepo) {
-        // Single click on the row does nothing. A double-click (detected
-        // manually: the browser dblclick event is unreliable because the
-        // first click re-renders the tree and replaces the row) selects the
-        // repo and flips its file listing.
+        // A single click selects the repo. A double-click (detected manually:
+        // the browser dblclick event is unreliable because the first click
+        // selects the repo, which re-renders the tree and replaces the row)
+        // additionally flips the file listing. The second click still lands
+        // on the freshly rendered row, so only state carries across.
         const now = Date.now();
         const last = state.lastRepoClick;
         state.lastRepoClick = { path: node.path, time: now };
         if (last && last.path === node.path && now - last.time < 500) {
           state.lastRepoClick = null;
-          selectRepo(node.path);
           toggleRepoFiles(node.path);
           return;
         }
+        selectRepo(node.path);
       } else if (node.children && node.children.length) {
         // non-repo root: toggle its first repo's expansion via key on the root path
         state.lastRepoClick = null;
