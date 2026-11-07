@@ -382,6 +382,13 @@ function reconcileSelection(validKeys) {
     if (byFile.has(file)) next.add(byFile.get(file));
   }
   state.selection = next;
+  // The anchor must stay a live row key too: staging a file changes its kind
+  // prefix (untracked:x -> staged:x), and a stale anchor would silently turn
+  // the next shift-click into a plain click.
+  if (state.anchor && !valid.has(state.anchor)) {
+    const file = state.anchor.slice(state.anchor.indexOf(':') + 1);
+    state.anchor = byFile.get(file) || null;
+  }
 }
 
 function applySelectionHighlight() {
@@ -434,7 +441,14 @@ async function onChangeRowClick(key, ev) {
     const a = state.rowOrder.indexOf(state.anchor);
     const b = state.rowOrder.indexOf(key);
     const [lo, hi] = a < b ? [a, b] : [b, a];
-    for (let i = lo; i <= hi; i++) state.selection.add(state.rowOrder[i]);
+    if (ev.metaKey || ev.ctrlKey) {
+      // shift+cmd: add the range between the two clicked rows to the selection
+      for (let i = lo; i <= hi; i++) state.selection.add(state.rowOrder[i]);
+    } else {
+      // plain shift: the range between the two clicked rows becomes the selection
+      state.selection = new Set();
+      for (let i = lo; i <= hi; i++) state.selection.add(state.rowOrder[i]);
+    }
   } else if (ev.metaKey || ev.ctrlKey) {
     if (state.selection.has(key)) state.selection.delete(key); else state.selection.add(key);
   } else {
@@ -517,6 +531,26 @@ async function refreshStatus() {
     }
     row.addEventListener('click', (ev) => onChangeRowClick(selKey, ev));
     row.addEventListener('dblclick', () => openInEditor(state.selected, item.file));
+    row.addEventListener('contextmenu', async (ev) => {
+      ev.preventDefault();
+      // Right-clicking a row outside the selection selects it first (standard
+      // behaviour), so the menu acts on what the user pointed at.
+      if (!state.selection.has(selKey)) {
+        const prev = new Set(state.selection);
+        state.selection = new Set([selKey]);
+        state.anchor = selKey;
+        applySelectionHighlight();
+        updateSelToolbar();
+        showChangesDiff();
+        await syncStaging(prev);
+      }
+      const act = await api.popupChangesMenu(state.selection.size);
+      if (act === 'commit') {
+        if (!$('btn-commit').disabled) $('btn-commit').click();
+      } else if (act === 'revert') {
+        $('btn-revert').click();
+      }
+    });
     list.appendChild(row);
   }
 

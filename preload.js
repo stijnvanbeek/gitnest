@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('gitnest', {
   cherryPick: (repo, hash) => ipcRenderer.invoke('repo:cherrypick', repo, hash),
   popupRevertMenu: (repo, hash, subject) => ipcRenderer.invoke('menu:revertcommit', repo, hash, subject),
   popupCherryMenu: (repo, hash, subject) => ipcRenderer.invoke('menu:cherrypick', repo, hash, subject),
+  popupChangesMenu: (n) => ipcRenderer.invoke('menu:changes', n),
   openInEditor: (repo, relPath) => ipcRenderer.invoke('repo:openineditor', repo, relPath),
   getOpLog: () => ipcRenderer.invoke('git:oplog'),
   onOp: (cb) => ipcRenderer.on('git:op', (e, entry) => cb(entry)),

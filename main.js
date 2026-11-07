@@ -179,6 +179,19 @@ function registerHandlers() {
     menu.popup({ window: BrowserWindow.fromWebContents(e.sender) });
   }));
 
+  // Popup menu on a changes row: commit the selection (uses the commit
+  // message box) or discard its changes. Resolves to 'commit', 'revert' or
+  // null when dismissed by clicking elsewhere.
+  ipcMain.handle('menu:changes', (e, n) => new Promise((resolve) => {
+    let picked = null;
+    const menu = Menu.buildFromTemplate([
+      { label: `Commit ${n} file(s)`, click: () => { picked = 'commit'; resolve(picked); } },
+      { label: `Revert changes in ${n} file(s)`, click: () => { picked = 'revert'; resolve(picked); } },
+    ]);
+    menu.on('menu-will-close', () => setTimeout(() => resolve(picked), 0));
+    menu.popup({ window: BrowserWindow.fromWebContents(e.sender) });
+  }));
+
   ipcMain.handle('repo:openineditor', (e, repo, relPath) => openInEditor(repo, relPath));
 
   ipcMain.handle('repos:scan', async () => {
