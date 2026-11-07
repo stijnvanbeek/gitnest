@@ -148,14 +148,30 @@ function registerHandlers() {
   ipcMain.handle('repo:merge', (e, repo, name) => git.merge(repo, name));
   ipcMain.handle('repo:revert', (e, repo, paths) => git.revert(repo, paths));
   ipcMain.handle('repo:revertcommit', (e, repo, hash) => git.revertCommit(repo, hash));
+  ipcMain.handle('repo:cherrypick', (e, repo, hash) => git.cherryPick(repo, hash));
 
   // Popup menu on a history row: resolves to true when the user picked
-  // "Revert", false when the menu was dismissed or cancelled.
+  // "Revert", false when the menu was dismissed by clicking elsewhere.
   ipcMain.handle('menu:revertcommit', (e, repo, hash, subject) => new Promise((resolve) => {
     let picked = false;
     const menu = Menu.buildFromTemplate([
       {
         label: `Revert commit ${hash} ("${(subject || '').slice(0, 60)}")`,
+        click: () => { picked = true; resolve(true); },
+      },
+    ]);
+    menu.on('menu-will-close', () => setTimeout(() => resolve(picked), 0));
+    menu.popup({ window: BrowserWindow.fromWebContents(e.sender) });
+  }));
+
+  // Popup menu on a row of the behind list: cherry-picks the commit from the
+  // selected branch onto the checked-out branch. Clicking elsewhere closes
+  // the menu without acting.
+  ipcMain.handle('menu:cherrypick', (e, repo, hash, subject) => new Promise((resolve) => {
+    let picked = false;
+    const menu = Menu.buildFromTemplate([
+      {
+        label: `Cherry-pick commit ${hash} ("${(subject || '').slice(0, 60)}")`,
         click: () => { picked = true; resolve(true); },
       },
     ]);

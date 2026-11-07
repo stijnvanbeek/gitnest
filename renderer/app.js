@@ -567,10 +567,26 @@ function renderLog() {
       highlightLogSelection();
       showCommitDiff(c);
     });
-    // right-click: revert this commit with a new "Revert ..." commit
+    // right-click: in behind mode cherry-pick the commit onto the checked-out
+    // branch, otherwise revert it with a new "Revert ..." commit
     row.addEventListener('contextmenu', async (ev) => {
       ev.preventDefault();
       if (!state.selected) return;
+      if (state.behindBranch) {
+        const go = await api.popupCherryMenu(state.selected, c.hash, c.subject);
+        if (!go) return;
+        const r = await api.cherryPick(state.selected, c.hash);
+        if (r.ok) {
+          setResult(`Cherry-picked ${c.hash} onto ${state.currentBranch}.`, false);
+          await Promise.all([refreshStatus(), refreshCounts()]);
+          await applyHistoryMode(); // the commit is now in both branches: refresh the list
+        } else if (r.conflicted) {
+          setResult(`Cherry-pick has conflicts. Conflicted files are marked with "!" in the changes list.\n${r.output || r.error}`, true);
+        } else {
+          setResult(`Cherry-pick failed:\n${r.error || r.output || ''}`, true);
+        }
+        return;
+      }
       const go = await api.popupRevertMenu(state.selected, c.hash, c.subject);
       if (!go) return;
       const r = await api.revertCommit(state.selected, c.hash);
