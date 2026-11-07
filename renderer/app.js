@@ -13,6 +13,7 @@ const state = {
   selectedFile: null,  // repo-relative path of the file selected in the tree
   currentBranch: null, // checked-out branch of the selected repo
   behindBranch: null,  // branch picked in the dropdown when the pane shows behind-commits
+  branchPick: null,    // {repo, name}: branch picked in the dropdown, kept across auto-refresh
   logError: null,      // error from the last behind-log fetch, if any
   selection: new Set(),// change keys: "staged:<file>" | "unstaged:<file>" | "untracked:<file>"
   anchor: null,        // last clicked key, for shift-range selection
@@ -699,6 +700,11 @@ $('btn-push').addEventListener('click', () => runAction('Push', () => api.push(s
 
 async function refreshBranches() {
   const sel = $('branch-select');
+  // A branch picked for the behind view must survive a rebuild: auto-refresh
+  // calls this every 5 seconds and would otherwise snap back to the
+  // checked-out branch while the user is reading the behind list.
+  const pick = state.branchPick && state.branchPick.repo === state.selected
+    ? state.branchPick.name : null;
   sel.innerHTML = '';
   if (!state.selected) return;
   const r = await api.branches(state.selected);
@@ -728,10 +734,14 @@ async function refreshBranches() {
     }
     sel.appendChild(group);
   }
-  // show the selected repo's current branch, not just the first entry
-  if (r.current) sel.value = r.current;
+  // restore the picked branch when it still exists, else show the current one
+  if (pick && [...sel.options].some((o) => o.value === pick)) sel.value = pick;
+  else if (r.current) sel.value = r.current;
   state.currentBranch = r.current;
-  sel.onchange = applyHistoryMode;
+  sel.onchange = () => {
+    state.branchPick = { repo: state.selected, name: sel.value };
+    applyHistoryMode();
+  };
   applyHistoryMode();
 }
 
@@ -796,6 +806,7 @@ $('btn-checkout').addEventListener('click', async () => {
   const name = $('branch-select').value;
   if (!name || !state.selected) return;
   await runAction(`Checkout ${name}`, () => api.checkout(state.selected, name));
+  state.branchPick = null; // the dropdown follows the new current branch
   await refreshBranches();
 });
 
@@ -813,6 +824,7 @@ $('branch-name').addEventListener('keydown', async (e) => {
   if (!name || !state.selected) return;
   $('branch-name').hidden = true;
   await runAction(`Create branch ${name}`, () => api.createBranch(state.selected, name));
+  state.branchPick = null; // the dropdown follows the new current branch
   await refreshBranches();
 });
 
