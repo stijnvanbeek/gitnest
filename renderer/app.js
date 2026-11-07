@@ -705,15 +705,34 @@ async function refreshBranches() {
   // checked-out branch while the user is reading the behind list.
   const pick = state.branchPick && state.branchPick.repo === state.selected
     ? state.branchPick.name : null;
-  sel.innerHTML = '';
   if (!state.selected) return;
   const r = await api.branches(state.selected);
   if (r.error || !r.branches || !r.branches.length) {
+    sel.innerHTML = '';
+    sel.dataset.sig = '';
     const o = document.createElement('option');
     o.textContent = r.error || '(no branches)';
     sel.appendChild(o);
     return;
   }
+  // Signature of the branch list. Auto-refresh calls this every 5 seconds:
+  // when the list is unchanged the dropdown's DOM is left alone entirely, so
+  // it does not flicker (a select whose options are replaced visibly flashes,
+  // and it also closes an open popup).
+  const sig = r.branches.map((b) => b.name + (b.current ? '*' : '')).join('|')
+    + '|' + (r.upstream || []).map((b) => b.name).join('|');
+  const want = pick && [...sel.options].some((o) => o.value === pick)
+    ? pick : r.current;
+  if (sel.dataset.sig === sig) {
+    state.currentBranch = r.current;
+    if (want && sel.value !== want) {
+      sel.value = want;
+      applyHistoryMode();
+    }
+    return;
+  }
+  sel.dataset.sig = sig;
+  sel.innerHTML = '';
   for (const b of r.branches) {
     const o = document.createElement('option');
     o.value = b.name;
@@ -735,8 +754,7 @@ async function refreshBranches() {
     sel.appendChild(group);
   }
   // restore the picked branch when it still exists, else show the current one
-  if (pick && [...sel.options].some((o) => o.value === pick)) sel.value = pick;
-  else if (r.current) sel.value = r.current;
+  if (want) sel.value = want;
   state.currentBranch = r.current;
   sel.onchange = () => {
     state.branchPick = { repo: state.selected, name: sel.value };
