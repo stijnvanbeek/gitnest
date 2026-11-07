@@ -395,6 +395,7 @@ section { display: flex; flex-direction: column; min-height: 0; }
   font-size: 12px;
   line-height: 1.35;
   white-space: pre;
+  tab-size: 4;
   user-select: text;
 }
 #diff-output .dl-add { color: var(--green); }
