@@ -700,6 +700,20 @@ async function refreshBranches() {
     o.textContent = b.current ? `${b.name} (current)` : b.name;
     sel.appendChild(o);
   }
+  // forks: the upstream remote's branches, under their own group. The value is
+  // the full upstream/<name>; checkout turns it into a local branch tracking
+  // it, merge and the behind view (git log current..upstream/name) accept it.
+  if (r.upstream && r.upstream.length) {
+    const group = document.createElement('optgroup');
+    group.label = 'upstream';
+    for (const b of r.upstream) {
+      const o = document.createElement('option');
+      o.value = b.name;
+      o.textContent = b.name;
+      group.appendChild(o);
+    }
+    sel.appendChild(group);
+  }
   // show the selected repo's current branch, not just the first entry
   if (r.current) sel.value = r.current;
   state.currentBranch = r.current;
@@ -795,6 +809,10 @@ $('btn-delete-branch').addEventListener('click', async () => {
   const cur = (r.branches || []).find((b) => b.current);
   if (cur && cur.name === name) {
     setResult('Cannot delete the current branch. Check out another one first.', true);
+    return;
+  }
+  if (name.startsWith('upstream/')) {
+    setResult('Cannot delete an upstream branch. Check it out to get a local branch, then delete that.', true);
     return;
   }
   if (!confirm(`Delete branch "${name}"? Local only, the remote is never touched.`)) return;
