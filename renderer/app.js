@@ -15,6 +15,8 @@ const state = {
   anchor: null,        // last clicked key, for shift-range selection
   rowOrder: [],        // keys in display order, for shift-range selection
   lastStatus: null,    // last status result, to know which files are untracked
+  lastRepoClick: null, // {path, time} for double-click detection that survives tree re-renders
+  lastFileClick: null, // {repoPath, relPath, time} for double-click detection on tree file rows
 };
 
 const $ = (id) => document.getElementById(id);
@@ -213,8 +215,19 @@ function renderFileTree(container, node, repoPath, prefix, depth) {
     if (state.selectedFile === relPath) row.classList.add('selected');
     row.style.paddingLeft = `${8 + depth * 14 + 18}px`;
     row.innerHTML = `<span class="tree-icon file-icon">·</span><span>${esc(file)}</span>`;
-    row.addEventListener('click', () => selectFile(repoPath, relPath));
-    row.addEventListener('dblclick', () => openInEditor(repoPath, relPath));
+    row.addEventListener('click', () => {
+      // Same manual double-click detection as the repo rows: the single click
+      // re-renders the tree, so a browser dblclick event would never arrive.
+      const now = Date.now();
+      const last = state.lastFileClick;
+      state.lastFileClick = { repoPath, relPath, time: now };
+      if (last && last.repoPath === repoPath && last.relPath === relPath && now - last.time < 500) {
+        state.lastFileClick = null;
+        openInEditor(repoPath, relPath);
+        return;
+      }
+      selectFile(repoPath, relPath);
+    });
     container.appendChild(row);
   }
 }
@@ -263,31 +276,31 @@ function renderTreeNodes(container, nodes, depth) {
 
     row.addEventListener('click', (ev) => {
       if (node.isRepo && hasChildren && ev.target.dataset && ev.target.dataset.caret !== undefined) {
+        state.lastRepoClick = null;
         if (state.expanded.has(node.path)) state.expanded.delete(node.path); else state.expanded.add(node.path);
         renderTree();
         return;
       }
       if (node.isRepo) {
+        // Double-click detection done manually: the browser dblclick event is
+        // unreliable here because the first click selects the repo, which
+        // re-renders the tree and replaces the row before the second click.
+        const now = Date.now();
+        const last = state.lastRepoClick;
+        state.lastRepoClick = { path: node.path, time: now };
+        if (last && last.path === node.path && now - last.time < 500) {
+          state.lastRepoClick = null;
+          toggleRepoFiles(node.path);
+          return;
+        }
         selectRepo(node.path);
       } else if (node.children && node.children.length) {
         // non-repo root: toggle its first repo's expansion via key on the root path
+        state.lastRepoClick = null;
         const key = `root:${node.path}`;
         if (state.expanded.has(key)) state.expanded.delete(key); else state.expanded.add(key);
         renderTree();
       }
-    });
-
-    // double-click on a repo toggles its file listing
-    row.addEventListener('dblclick', async () => {
-      if (!node.isRepo) return;
-      const key = `files:${node.path}`;
-      if (state.expanded.has(key)) {
-        state.expanded.delete(key);
-      } else {
-        state.expanded.add(key);
-        if (!state.fileTrees[node.path]) await loadFileTree(node.path);
-      }
-      renderTree();
     });
 
     container.appendChild(row);
@@ -311,6 +324,18 @@ function renderTreeNodes(container, nodes, depth) {
       renderTreeNodes(sub, node.children, depth + 1);
     }
   }
+}
+
+// Toggle the fold-out file listing of a repo row (double-click or caret use).
+async function toggleRepoFiles(repoPath) {
+  const key = `files:${repoPath}`;
+  if (state.expanded.has(key)) {
+    state.expanded.delete(key);
+  } else {
+    state.expanded.add(key);
+    if (!state.fileTrees[repoPath]) await loadFileTree(repoPath);
+  }
+  renderTree();
 }
 
 async function loadFileTree(repoPath) {
