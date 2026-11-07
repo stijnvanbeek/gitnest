@@ -11,6 +11,9 @@ const state = {
   log: [],
   selectedCommit: null,
   selectedFile: null,  // repo-relative path of the file selected in the tree
+  currentBranch: null, // checked-out branch of the selected repo
+  behindBranch: null,  // branch picked in the dropdown when the pane shows behind-commits
+  logError: null,      // error from the last behind-log fetch, if any
   selection: new Set(),// change keys: "staged:<file>" | "unstaged:<file>" | "untracked:<file>"
   anchor: null,        // last clicked key, for shift-range selection
   rowOrder: [],        // keys in display order, for shift-range selection
@@ -147,6 +150,8 @@ async function selectFile(repoPath, relPath) {
   if (state.selected !== repoPath) return;
   state.selectedFile = relPath;
   state.selectedCommit = null;
+  state.behindBranch = null; // a file pick always shows the file's own history
+  state.logError = null;
   applySelectionHighlight();
   updateSelToolbar();
   renderTree();
@@ -413,9 +418,12 @@ async function syncStaging(prev) {
 }
 
 async function onChangeRowClick(key, ev) {
-  if (state.selectedFile) {
-    // a change click takes over from a tree-file selection: back to repo-wide history
+  if (state.selectedFile || state.behindBranch) {
+    // a change click takes over from a tree-file selection or the behind view:
+    // back to repo-wide history
     state.selectedFile = null;
+    state.behindBranch = null;
+    state.logError = null;
     renderTree();
     $('history-pane').querySelector('.pane-header').textContent = 'History';
     refreshLog();
@@ -529,6 +537,7 @@ async function refreshStatus() {
 
 async function refreshLog() {
   if (!state.selected) return;
+  if (state.behindBranch) return; // the behind view owns the list; applyHistoryMode fills it
   const log = await api.log(state.selected);
   state.log = Array.isArray(log) ? log : [];
   state.selectedCommit = null;
@@ -539,7 +548,10 @@ function renderLog() {
   const list = $('log-list');
   list.innerHTML = '';
   if (!state.log.length) {
-    list.innerHTML = '<div class="pane-empty">No commits yet.</div>';
+    list.innerHTML = state.behindBranch
+      ? (state.logError ? `<div class="pane-empty">error: ${esc(state.logError)}</div>`
+        : '<div class="pane-empty">Already up to date: nothing to merge.</div>')
+      : '<div class="pane-empty">No commits yet.</div>';
     return;
   }
   for (const c of state.log) {
@@ -674,6 +686,66 @@ async function refreshBranches() {
   }
   // show the selected repo's current branch, not just the first entry
   if (r.current) sel.value = r.current;
+  state.currentBranch = r.current;
+  sel.onchange = applyHistoryMode;
+  applyHistoryMode();
+}
+
+// History pane mode: with a branch other than the checked-out one picked in
+// the dropdown, the panel becomes "BEHIND <branch>" and lists the commits the
+// current branch is behind it, the ones Merge would bring in. Picking the
+// current branch again (or checking out, merging, ...) restores the normal
+// history view.
+async function applyHistoryMode() {
+  if (!state.selected) return;
+  const picked = $('branch-select').value;
+  if (!picked || !state.currentBranch || picked === state.currentBranch) {
+    if (state.behindBranch) {
+      state.behindBranch = null;
+      state.logError = null;
+      state.selectedCommit = null;
+      restoreHistoryPane();
+    }
+    return;
+  }
+  state.behindBranch = picked;
+  state.logError = null;
+  state.selectedCommit = null;
+  state.selectedFile = null;
+  renderTree();
+  $('history-pane').querySelector('.pane-header').textContent = `Behind ${picked}`;
+  setDiff(`Commits in ${picked} not in ${state.currentBranch}`, 'Loading…');
+  const log = await api.logRange(state.selected, `${state.currentBranch}..${picked}`);
+  if (state.behindBranch !== picked) return; // selection changed while fetching
+  if (log && log.error) {
+    state.logError = log.error;
+    state.log = [];
+  } else {
+    state.log = Array.isArray(log) ? log : [];
+  }
+  highlightLogSelection();
+  renderLog();
+  setDiff(`Commits in ${picked} not in ${state.currentBranch}`,
+    state.logError ? `error: ${state.logError}`
+      : state.log.length ? `${state.log.length} commit(s) will be merged into ${state.currentBranch}. Select one to see its diff.`
+        : 'Already up to date: nothing to merge.');
+}
+
+// Back to the normal history view after behind mode: file history when a tree
+// file is picked, repo history otherwise.
+function restoreHistoryPane() {
+  if (state.selectedFile) {
+    $('history-pane').querySelector('.pane-header').textContent = `History — ${state.selectedFile}`;
+    api.log(state.selected, [state.selectedFile]).then((log) => {
+      if (state.behindBranch) return;
+      state.log = Array.isArray(log) ? log : [];
+      highlightLogSelection();
+      renderLog();
+    });
+  } else {
+    $('history-pane').querySelector('.pane-header').textContent = 'History';
+    refreshLog();
+  }
 }
 
 $('btn-checkout').addEventListener('click', async () => {
@@ -835,6 +907,9 @@ async function selectRepo(repoPath) {
   state.selected = repoPath;
   state.selectedCommit = null;
   state.selectedFile = null;
+  state.behindBranch = null;
+  state.currentBranch = null;
+  state.logError = null;
   state.selection = new Set();
   state.anchor = null;
   $('history-pane').querySelector('.pane-header').textContent = 'History';

@@ -158,8 +158,6 @@ function registerHandlers() {
         label: `Revert commit ${hash} ("${(subject || '').slice(0, 60)}")`,
         click: () => { picked = true; resolve(true); },
       },
-      { type: 'separator' },
-      { label: 'Cancel', click: () => resolve(false) },
     ]);
     menu.on('menu-will-close', () => setTimeout(() => resolve(picked), 0));
     menu.popup({ window: BrowserWindow.fromWebContents(e.sender) });
@@ -193,6 +191,7 @@ function registerHandlers() {
   ipcMain.handle('repo:pull', (e, repo) => git.pull(repo));
   ipcMain.handle('repo:fetch', (e, repo) => git.fetchAll(repo));
   ipcMain.handle('repo:log', (e, repo, paths) => git.log(repo, 100, paths || []));
+  ipcMain.handle('repo:logrange', (e, repo, range) => git.logRange(repo, range));
   ipcMain.handle('repo:show', (e, repo, hash) => git.show(repo, hash));
   ipcMain.handle('repo:diff', (e, repo, paths, cached) => git.diff(repo, paths, cached));
   ipcMain.handle('repo:commitdiff', (e, repo, hash, paths) => git.commitDiff(repo, hash, paths || []));

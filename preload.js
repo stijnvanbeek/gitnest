@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('gitnest', {
   pull: (repo) => ipcRenderer.invoke('repo:pull', repo),
   fetch: (repo) => ipcRenderer.invoke('repo:fetch', repo),
   log: (repo, paths) => ipcRenderer.invoke('repo:log', repo, paths),
+  logRange: (repo, range) => ipcRenderer.invoke('repo:logrange', repo, range),
   show: (repo, hash) => ipcRenderer.invoke('repo:show', repo, hash),
   diff: (repo, paths, cached) => ipcRenderer.invoke('repo:diff', repo, paths, cached),
   commitDiff: (repo, hash, paths) => ipcRenderer.invoke('repo:commitdiff', repo, hash, paths),
