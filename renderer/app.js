@@ -283,24 +283,34 @@ function renderTreeNodes(container, nodes, depth) {
       ${badge}`;
 
     row.addEventListener('click', (ev) => {
-      if (node.isRepo && hasChildren && ev.target.dataset && ev.target.dataset.caret !== undefined) {
-        state.lastRepoClick = null;
-        if (state.expanded.has(node.path)) state.expanded.delete(node.path); else state.expanded.add(node.path);
-        renderTree();
-        return;
-      }
+      // A click on the caret toggles the nested-repo expansion; but it takes
+      // part in the same double-click detection as the rest of the row, so a
+      // double-click on the caret flips the file listing like anywhere else.
+      // Without this, two caret clicks would toggle the children twice (no
+      // visible change) and never collapse the listing.
+      const onCaret = node.isRepo && hasChildren && ev.target.dataset && ev.target.dataset.caret !== undefined;
       if (node.isRepo) {
-        // Double-click detection done manually: the browser dblclick event is
-        // unreliable here because the first click selects the repo, which
-        // re-renders the tree and replaces the row before the second click.
         const now = Date.now();
         const last = state.lastRepoClick;
-        state.lastRepoClick = { path: node.path, time: now };
+        state.lastRepoClick = { path: node.path, time: now, caret: onCaret, childrenOpen: state.expanded.has(node.path) };
         if (last && last.path === node.path && now - last.time < 500) {
           state.lastRepoClick = null;
+          // The double-click started on the caret, whose first click toggled
+          // the children: put them back so only the file listing changes.
+          if (last.caret || onCaret) {
+            if (last.childrenOpen) state.expanded.add(node.path); else state.expanded.delete(node.path);
+          }
           toggleRepoFiles(node.path);
           return;
         }
+        if (onCaret) {
+          if (state.expanded.has(node.path)) state.expanded.delete(node.path); else state.expanded.add(node.path);
+          renderTree();
+          return;
+        }
+        // Double-click detection done manually: the browser dblclick event is
+        // unreliable here because the first click selects the repo, which
+        // re-renders the tree and replaces the row before the second click.
         selectRepo(node.path);
       } else if (node.children && node.children.length) {
         // non-repo root: toggle its first repo's expansion via key on the root path
