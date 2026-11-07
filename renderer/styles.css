@@ -111,9 +111,8 @@ section { display: flex; flex-direction: column; min-height: 0; }
 .oplog-row {
   padding: 3px 10px;
   border-bottom: 1px solid #262a33;
-  overflow: hidden;
+  /* long commands scroll horizontally instead of being truncated */
   white-space: nowrap;
-  text-overflow: ellipsis;
   user-select: text;
 }
 .oplog-row .op-cmd { font-weight: 600; }
