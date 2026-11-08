@@ -15,6 +15,8 @@ const state = {
   behindBranch: null,  // branch picked in the dropdown when the pane shows behind-commits
   branchPick: null,    // {repo, name}: branch picked in the dropdown, kept across auto-refresh
   logError: null,      // error from the last behind-log fetch, if any
+  logTruncated: false, // history list hit the 100-commit display cap
+  logTotal: null,      // real commit count behind the list, when known
   selection: new Set(),// change keys: "staged:<file>" | "unstaged:<file>" | "untracked:<file>"
   anchor: null,        // last clicked key, for shift-range selection
   rowOrder: [],        // keys in display order, for shift-range selection
@@ -158,8 +160,10 @@ async function selectFile(repoPath, relPath) {
   renderTree();
   $('history-pane').querySelector('.pane-header').textContent = `History — ${relPath}`;
   setDiff(`${relPath} (working tree diff)`, 'Loading…');
-  const log = await api.log(repoPath, [relPath]);
-  state.log = Array.isArray(log) ? log : [];
+  const res = await api.log(repoPath, [relPath]);
+  state.log = (res && res.entries) || [];
+  state.logTruncated = !!(res && res.truncated);
+  state.logTotal = res ? res.total : null;
   highlightLogSelection();
   renderLog();
   await showFileDiff();
@@ -575,8 +579,10 @@ async function refreshStatus() {
 async function refreshLog() {
   if (!state.selected) return;
   if (state.behindBranch) return; // the behind view owns the list; applyHistoryMode fills it
-  const log = await api.log(state.selected);
-  state.log = Array.isArray(log) ? log : [];
+  const res = await api.log(state.selected);
+  state.log = (res && res.entries) || [];
+  state.logTruncated = !!(res && res.truncated);
+  state.logTotal = res ? res.total : null;
   // A picked commit stays picked across auto-refreshes while it is still in
   // the log; clearing it here would reset the highlight and let the diff
   // pane fall back to the changes view every 5 seconds.
@@ -641,6 +647,14 @@ function renderLog() {
       }
     });
     list.appendChild(row);
+  }
+  if (state.logTruncated) {
+    const note = document.createElement('div');
+    note.className = 'log-truncated';
+    note.textContent = state.logTotal
+      ? `showing ${state.log.length} of ${state.logTotal.toLocaleString()}, older commits hidden`
+      : `showing the latest ${state.log.length} commits, older ones hidden`;
+    list.appendChild(note);
   }
 }
 
@@ -828,19 +842,24 @@ async function applyHistoryMode() {
   renderTree();
   $('history-pane').querySelector('.pane-header').textContent = `Behind ${picked}`;
   setDiff(`Commits in ${picked} not in ${state.currentBranch}`, 'Loading…');
-  const log = await api.logRange(state.selected, `${state.currentBranch}..${picked}`);
+  const res = await api.logRange(state.selected, `${state.currentBranch}..${picked}`);
   if (state.behindBranch !== picked) return; // selection changed while fetching
-  if (log && log.error) {
-    state.logError = log.error;
+  if (res && res.error) {
+    state.logError = res.error;
     state.log = [];
+    state.logTruncated = false;
+    state.logTotal = null;
   } else {
-    state.log = Array.isArray(log) ? log : [];
+    state.log = (res && res.entries) || [];
+    state.logTruncated = !!(res && res.truncated);
+    state.logTotal = res ? res.total : null;
   }
   highlightLogSelection();
   renderLog();
+  const behind = state.logTotal != null ? state.logTotal : state.log.length;
   setDiff(`Commits in ${picked} not in ${state.currentBranch}`,
     state.logError ? `error: ${state.logError}`
-      : state.log.length ? `${state.log.length} commit(s) will be merged into ${state.currentBranch}. Select one to see its diff.`
+      : behind ? `${behind} commit(s) will be merged into ${state.currentBranch}. Select one to see its diff.`
         : 'Already up to date: nothing to merge.');
 }
 
@@ -849,9 +868,11 @@ async function applyHistoryMode() {
 function restoreHistoryPane() {
   if (state.selectedFile) {
     $('history-pane').querySelector('.pane-header').textContent = `History — ${state.selectedFile}`;
-    api.log(state.selected, [state.selectedFile]).then((log) => {
+    api.log(state.selected, [state.selectedFile]).then((res) => {
       if (state.behindBranch) return;
-      state.log = Array.isArray(log) ? log : [];
+      state.log = (res && res.entries) || [];
+      state.logTruncated = !!(res && res.truncated);
+      state.logTotal = res ? res.total : null;
       highlightLogSelection();
       renderLog();
     });
@@ -1029,6 +1050,8 @@ async function selectRepo(repoPath) {
   state.behindBranch = null;
   state.currentBranch = null;
   state.logError = null;
+  state.logTruncated = false;
+  state.logTotal = null;
   state.selection = new Set();
   state.anchor = null;
   $('history-pane').querySelector('.pane-header').textContent = 'History';
