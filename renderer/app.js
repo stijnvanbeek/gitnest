@@ -565,7 +565,9 @@ async function refreshStatus() {
   }
   applySelectionHighlight();
   updateSelToolbar();
-  if (state.selection.size) await showChangesDiff();
+  // Auto-refresh must not steal the diff pane back from a picked commit or
+  // tree file; clicking a change row hands it back to the changes diff.
+  if (state.selection.size && !state.selectedCommit && !state.selectedFile) await showChangesDiff();
   // during a merge a commit completes the merge even with an empty index
   $('btn-commit').disabled = !s.staged.length && !s.merging;
 }
@@ -575,7 +577,12 @@ async function refreshLog() {
   if (state.behindBranch) return; // the behind view owns the list; applyHistoryMode fills it
   const log = await api.log(state.selected);
   state.log = Array.isArray(log) ? log : [];
-  state.selectedCommit = null;
+  // A picked commit stays picked across auto-refreshes while it is still in
+  // the log; clearing it here would reset the highlight and let the diff
+  // pane fall back to the changes view every 5 seconds.
+  if (state.selectedCommit && !state.log.some((c) => c.hash === state.selectedCommit)) {
+    state.selectedCommit = null;
+  }
   renderLog();
 }
 
