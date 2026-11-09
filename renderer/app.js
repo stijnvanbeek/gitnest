@@ -614,9 +614,8 @@ function renderLog() {
     row.className = 'log-row';
     row.dataset.hash = c.hash;
     if (state.selectedCommit === c.hash) row.classList.add('selected');
-    const tagBadges = (c.tags || []).map((t) => `<span class="tag-badge">${esc(t)}</span>`).join('');
     row.innerHTML = `
-      <div class="subject">${tagBadges}${esc(c.subject)}</div>
+      <div class="subject">${esc(c.subject)}</div>
       <div class="meta"><span class="hash">${esc(c.hash)}</span> · ${esc(c.author)} · ${esc(relDate(c.date))}</div>`;
     row.addEventListener('click', () => {
       state.selectedCommit = c.hash;

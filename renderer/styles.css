@@ -375,7 +375,6 @@ section { display: flex; flex-direction: column; min-height: 0; }
 .log-row .subject { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .log-row .meta { color: var(--fg-dim); font-size: 11px; margin-top: 1px; }
 .log-row .hash { color: var(--accent); font-family: ui-monospace, Menlo, monospace; }
-.tag-badge { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 8px; border: 1px solid var(--accent); color: var(--accent); font-size: 10px; font-weight: 500; vertical-align: 1px; }
 
 #diff-pane {
   flex: 1 1 50%;
