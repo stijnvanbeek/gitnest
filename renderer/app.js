@@ -18,6 +18,7 @@ const state = {
   logTruncated: false, // history list hit the 100-commit display cap
   logTotal: null,      // real commit count behind the list, when known
   logSig: null,        // hash signature of the rendered log, to skip redundant rebuilds
+  logQuery: '',        // history search text; filters the rows in the log list
   selection: new Set(),// change keys: "staged:<file>" | "unstaged:<file>" | "untracked:<file>"
   anchor: null,        // last clicked key, for shift-range selection
   rowOrder: [],        // keys in display order, for shift-range selection
@@ -609,7 +610,21 @@ function renderLog() {
       : '<div class="pane-empty">No commits yet.</div>';
     return;
   }
-  for (const c of state.log) {
+  // history search: filter over the whole (uncapped) list, matching subject,
+  // author, hash and tag names
+  const q = state.logQuery.trim().toLowerCase();
+  const shown = q
+    ? state.log.filter((c) =>
+        c.subject.toLowerCase().includes(q)
+        || c.author.toLowerCase().includes(q)
+        || c.hash.toLowerCase().includes(q)
+        || (c.tags || []).some((t) => t.toLowerCase().includes(q)))
+    : state.log;
+  if (q && !shown.length) {
+    list.innerHTML = `<div class="pane-empty">No commits match "${esc(state.logQuery.trim())}".</div>`;
+    return;
+  }
+  for (const c of shown) {
     const row = document.createElement('div');
     row.className = 'log-row';
     row.dataset.hash = c.hash;
@@ -662,6 +677,11 @@ function renderLog() {
     note.textContent = state.logTotal
       ? `showing ${state.log.length} of ${state.logTotal.toLocaleString()}, older commits hidden`
       : `showing the latest ${state.log.length} commits, older ones hidden`;
+    list.appendChild(note);
+  } else if (q) {
+    const note = document.createElement('div');
+    note.className = 'log-truncated';
+    note.textContent = `${shown.length.toLocaleString()} of ${state.log.length.toLocaleString()} commits match`;
     list.appendChild(note);
   }
 }
@@ -1056,6 +1076,22 @@ $('commit-message').addEventListener('keydown', (e) => {
   }
 });
 
+// History search: filter the log list as you type. Escape clears and gives
+// the focus back so keyboard scrolling of the list keeps working.
+$('log-search').addEventListener('input', () => {
+  state.logQuery = $('log-search').value;
+  renderLog();
+});
+$('log-search').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    $('log-search').value = '';
+    state.logQuery = '';
+    renderLog();
+    $('log-search').blur();
+  }
+});
+
 async function selectRepo(repoPath) {
   state.selected = repoPath;
   state.selectedCommit = null;
@@ -1065,6 +1101,8 @@ async function selectRepo(repoPath) {
   state.logError = null;
   state.logTruncated = false;
   state.logTotal = null;
+  state.logQuery = '';
+  $('log-search').value = '';
   state.logSig = null;
   state.selection = new Set();
   state.anchor = null;

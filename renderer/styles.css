@@ -365,6 +365,20 @@ section { display: flex; flex-direction: column; min-height: 0; }
   border-bottom: 1px solid var(--border);
 }
 
+#log-search {
+  margin: 6px 8px;
+  padding: 4px 8px;
+  background: var(--bg-alt);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+#log-search:focus { outline: none; border-color: var(--accent); }
+#log-search::placeholder { color: var(--fg-dim); }
+
 .log-row {
   padding: 5px 12px;
   cursor: pointer;
