@@ -595,7 +595,10 @@ async function refreshStatus() {
 async function refreshLog() {
   if (!state.selected) return;
   if (state.behindBranch) return; // the behind view owns the list; applyHistoryMode fills it
-  const res = await api.log(state.selected);
+  // File-scoped history: keep refreshing the selected file's log so the view
+  // stays fresh without falling back to the repo-wide history.
+  const paths = state.selectedFile ? [state.selectedFile] : [];
+  const res = await api.log(state.selected, paths);
   state.log = (res && res.entries) || [];
   state.logTruncated = !!(res && res.truncated);
   state.logTotal = res ? res.total : null;
