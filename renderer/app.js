@@ -290,7 +290,7 @@ function renderTreeNodes(container, nodes, depth) {
       ${node.isRepo && hasChildren
         ? `<span class="tree-caret ${isOpen ? 'expanded' : ''}" data-caret="${esc(node.path)}">▶</span>`
         : '<span class="tree-caret"></span>'}
-      <span class="tree-icon ${node.isRepo ? 'repo-icon' : 'folder-icon'}">${node.isRepo ? '⌂' : '▸'}</span>
+      <span class="tree-icon ${node.isRepo ? 'repo-icon' : 'folder-icon'}" ${node.isRepo ? 'title="Click to show or hide the file list"' : ''}>${node.isRepo ? '⌂' : '▸'}</span>
       <span class="${node.isRepo ? 'repo-name' : 'root-name'}" title="${esc(node.path)}">${esc(node.name)}</span>
       ${badge}`;
 
@@ -301,6 +301,14 @@ function renderTreeNodes(container, nodes, depth) {
         state.lastRepoClick = null;
         if (state.expanded.has(node.path)) state.expanded.delete(node.path); else state.expanded.add(node.path);
         renderTree();
+        return;
+      }
+      // A click on the repo icon toggles the fold-out file listing. This is
+      // the reliable way to open it: the double-click below is timing based
+      // and misses when a refresh re-renders the tree between the two clicks.
+      if (node.isRepo && ev.target.classList && ev.target.classList.contains('tree-icon')) {
+        state.lastRepoClick = null;
+        toggleRepoFiles(node.path);
         return;
       }
       if (node.isRepo) {
@@ -350,14 +358,20 @@ function renderTreeNodes(container, nodes, depth) {
   }
 }
 
-// Toggle the fold-out file listing of a repo row (double-click or caret use).
+// Toggle the fold-out file listing of a repo row (repo icon click or the
+// double-click on the row). Render the expansion at once so the affordance
+// responds immediately, then fill in the file tree when git returns it.
 async function toggleRepoFiles(repoPath) {
   const key = `files:${repoPath}`;
   if (state.expanded.has(key)) {
     state.expanded.delete(key);
-  } else {
-    state.expanded.add(key);
-    if (!state.fileTrees[repoPath]) await loadFileTree(repoPath);
+    renderTree();
+    return;
+  }
+  state.expanded.add(key);
+  if (!state.fileTrees[repoPath]) {
+    renderTree();
+    await loadFileTree(repoPath);
   }
   renderTree();
 }

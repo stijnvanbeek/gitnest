@@ -160,7 +160,7 @@ section { display: flex; flex-direction: column; min-height: 0; }
 .tree-caret.expanded { transform: rotate(90deg); }
 
 .tree-icon { flex-shrink: 0; }
-.repo-icon { color: var(--accent); }
+.repo-icon { color: var(--accent); cursor: pointer; }
 .folder-icon { color: var(--fg-dim); }
 .file-icon { color: var(--fg-dim); opacity: 0.7; }
 
