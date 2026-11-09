@@ -17,6 +17,7 @@ const state = {
   logError: null,      // error from the last behind-log fetch, if any
   logTruncated: false, // history list hit the 100-commit display cap
   logTotal: null,      // real commit count behind the list, when known
+  logSig: null,        // hash signature of the rendered log, to skip redundant rebuilds
   selection: new Set(),// change keys: "staged:<file>" | "unstaged:<file>" | "untracked:<file>"
   anchor: null,        // last clicked key, for shift-range selection
   rowOrder: [],        // keys in display order, for shift-range selection
@@ -589,10 +590,16 @@ async function refreshLog() {
   if (state.selectedCommit && !state.log.some((c) => c.hash === state.selectedCommit)) {
     state.selectedCommit = null;
   }
+  // The log is uncapped and can be thousands of rows: when nothing changed,
+  // skip the rebuild so the 5-second refresh stays cheap (large logs only —
+  // small ones keep re-rendering so their relative dates stay fresh).
+  const sig = state.log.map((c) => c.hash).join(',');
+  if (sig === state.logSig && state.log.length > 300) return;
   renderLog();
 }
 
 function renderLog() {
+  state.logSig = state.log.map((c) => c.hash).join(',');
   const list = $('log-list');
   list.innerHTML = '';
   if (!state.log.length) {
@@ -1052,6 +1059,7 @@ async function selectRepo(repoPath) {
   state.logError = null;
   state.logTruncated = false;
   state.logTotal = null;
+  state.logSig = null;
   state.selection = new Set();
   state.anchor = null;
   $('history-pane').querySelector('.pane-header').textContent = 'History';
