@@ -782,7 +782,8 @@ async function refreshBranches() {
   // it does not flicker (a select whose options are replaced visibly flashes,
   // and it also closes an open popup).
   const sig = r.branches.map((b) => b.name + (b.current ? '*' : '')).join('|')
-    + '|' + (r.upstream || []).map((b) => b.name).join('|');
+    + '|' + (r.upstream || []).map((b) => b.name).join('|')
+    + '|' + (r.origin || []).map((b) => b.name).join('|');
   const want = pick && [...sel.options].some((o) => o.value === pick)
     ? pick : r.current;
   if (sel.dataset.sig === sig) {
@@ -801,19 +802,23 @@ async function refreshBranches() {
     o.textContent = b.current ? `${b.name} (current)` : b.name;
     sel.appendChild(o);
   }
-  // forks: the upstream remote's branches, under their own group. The value is
-  // the full upstream/<name>; checkout turns it into a local branch tracking
-  // it, merge and the behind view (git log current..upstream/name) accept it.
-  if (r.upstream && r.upstream.length) {
-    const group = document.createElement('optgroup');
-    group.label = 'upstream';
-    for (const b of r.upstream) {
-      const o = document.createElement('option');
-      o.value = b.name;
-      o.textContent = b.name;
-      group.appendChild(o);
+  // remote-only branches under their own groups. The value is the full
+  // upstream/<name> or origin/<name>; checkout turns it into a local branch
+  // tracking it, merge and the behind view (git log current..origin/name)
+  // accept the full name. origin/ lists only branches with no local twin,
+  // so a locally checked-out branch is never shown twice.
+  for (const [key, label] of [['upstream', 'upstream'], ['origin', 'origin']]) {
+    if (r[key] && r[key].length) {
+      const group = document.createElement('optgroup');
+      group.label = label;
+      for (const b of r[key]) {
+        const o = document.createElement('option');
+        o.value = b.name;
+        o.textContent = b.name;
+        group.appendChild(o);
+      }
+      sel.appendChild(group);
     }
-    sel.appendChild(group);
   }
   // restore the picked branch when it still exists, else show the current one
   if (want) sel.value = want;
@@ -924,8 +929,8 @@ $('btn-delete-branch').addEventListener('click', async () => {
     setResult('Cannot delete the current branch. Check out another one first.', true);
     return;
   }
-  if (name.startsWith('upstream/')) {
-    setResult('Cannot delete an upstream branch. Check it out to get a local branch, then delete that.', true);
+  if (name.startsWith('upstream/') || name.startsWith('origin/')) {
+    setResult('Cannot delete a remote branch from here. Check it out to get a local branch, then delete that.', true);
     return;
   }
   if (!confirm(`Delete branch "${name}"? Local only, the remote is never touched.`)) return;
