@@ -25,6 +25,7 @@ const state = {
   lastStatus: null,    // last status result, to know which files are untracked
   lastRepoClick: null, // {path, time} for double-click detection that survives tree re-renders
   lastFileClick: null, // {repoPath, relPath, time} for double-click detection on tree file rows
+  changeCursor: null,  // row key the arrow keys move through the changes list
 };
 
 const $ = (id) => document.getElementById(id);
@@ -409,6 +410,11 @@ function reconcileSelection(validKeys) {
     const file = state.anchor.slice(state.anchor.indexOf(':') + 1);
     state.anchor = byFile.get(file) || null;
   }
+  // keep the arrow-key cursor on the same file when its kind prefix changes
+  if (state.changeCursor && !valid.has(state.changeCursor)) {
+    const file = state.changeCursor.slice(state.changeCursor.indexOf(':') + 1);
+    state.changeCursor = byFile.get(file) || null;
+  }
 }
 
 function applySelectionHighlight() {
@@ -476,11 +482,65 @@ async function onChangeRowClick(key, ev) {
       ? new Set() : new Set([key]);
   }
   state.anchor = key;
+  state.changeCursor = key;
   applySelectionHighlight();
   updateSelToolbar();
   showChangesDiff();
   await syncStaging(prev);
 }
+
+// Arrow-key navigation in the changes list: Up/Down moves the selection one
+// row, shift+Up/Down extends it from the anchor like shift+click. The
+// selection is the staged set, so moving it stages and unstages as it goes.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+  if (!state.selected || !state.rowOrder.length) return;
+  e.preventDefault();
+  const order = state.rowOrder;
+  // The cursor is the row the next arrow moves from; it follows the anchor
+  // when that is a live row, otherwise navigation starts at an end of the list.
+  let cursor = order.includes(state.changeCursor) ? order.indexOf(state.changeCursor)
+    : order.includes(state.anchor) ? order.indexOf(state.anchor)
+    : null;
+  if (cursor === null) cursor = e.key === 'ArrowDown' ? -1 : order.length;
+  const next = e.key === 'ArrowDown' ? cursor + 1 : cursor - 1;
+  if (next < 0 || next >= order.length) return; // stay at the ends
+  const key = order[next];
+  if (state.selectedFile || state.behindBranch) {
+    // arrow navigation takes over from a tree-file selection or the behind
+    // view: back to repo-wide history, same as clicking a change row
+    state.selectedFile = null;
+    state.behindBranch = null;
+    state.logError = null;
+    renderTree();
+    $('history-pane').querySelector('.pane-header').textContent = 'History';
+    refreshLog();
+  }
+  const prev = new Set(state.selection);
+  if (e.shiftKey && state.anchor && order.includes(state.anchor)) {
+    // extend from the fixed anchor to the new cursor row, like shift+click
+    const a = order.indexOf(state.anchor);
+    const [lo, hi] = a < next ? [a, next] : [next, a];
+    if (e.metaKey || e.ctrlKey) {
+      for (let i = lo; i <= hi; i++) state.selection.add(order[i]);
+    } else {
+      state.selection = new Set();
+      for (let i = lo; i <= hi; i++) state.selection.add(order[i]);
+    }
+  } else {
+    state.selection = new Set([key]);
+    state.anchor = key;
+  }
+  state.changeCursor = key;
+  applySelectionHighlight();
+  updateSelToolbar();
+  showChangesDiff();
+  syncStaging(prev);
+  const row = document.querySelector(`#changes-list .change-row[data-key="${CSS.escape(key)}"]`);
+  if (row) row.scrollIntoView({ block: 'nearest' });
+});
 
 async function refreshStatus() {
   if (!state.selected) return;
@@ -1079,6 +1139,7 @@ $('btn-revert').addEventListener('click', async () => {
     setResult('Reverted.', false);
     state.selection = new Set();
     state.anchor = null;
+    state.changeCursor = null;
     await fullRefresh();
   } else {
     setResult(`Revert failed:\n${r.error}`, true);
@@ -1123,6 +1184,7 @@ async function selectRepo(repoPath) {
   state.logSig = null;
   state.selection = new Set();
   state.anchor = null;
+  state.changeCursor = null;
   $('history-pane').querySelector('.pane-header').textContent = 'History';
   $('history-empty').hidden = true;
   $('history-content').hidden = false;
