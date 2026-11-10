@@ -15,7 +15,7 @@ async function readConfig() {
   try {
     return JSON.parse(await fs.readFile(configPath(), 'utf8'));
   } catch {
-    return { roots: [] };
+    return { roots: [], excluded: [] };
   }
 }
 
@@ -54,15 +54,19 @@ async function openInEditor(repo, relPath) {
 // Build the repo tree for all configured roots. Every found repo becomes a
 // node; a repo nested inside another repo becomes a child of its nearest
 // ancestor repo, so nap and nap/modules/... appear as parent and children.
-async function buildTree(roots) {
+async function buildTree(roots, excluded = []) {
+  const isExcluded = (p) => excluded.some((e) => p === e || p.startsWith(e + path.sep));
   const tree = [];
   for (const root of roots) {
+    if (isExcluded(root)) continue;
     let found = [];
     try {
       found = await git.findRepos(root);
     } catch {
       found = [];
     }
+    // repos hidden through Remove Repository (and everything nested in them)
+    found = found.filter((rp) => !isExcluded(rp));
     const rootNode = {
       name: path.basename(root) || root,
       path: root,
@@ -106,11 +110,18 @@ function registerHandlers() {
     return cfg.roots;
   });
 
-  ipcMain.handle('roots:remove', async (e, p) => {
+  ipcMain.handle('repos:remove', async (e, p) => {
     const cfg = await readConfig();
-    cfg.roots = cfg.roots.filter((r) => r !== p);
+    if (cfg.roots.includes(p)) {
+      // a configured root: drop it from the list entirely
+      cfg.roots = cfg.roots.filter((r) => r !== p);
+    } else {
+      // a nested repo: keep the root, hide this repo (and its nested repos)
+      if (!Array.isArray(cfg.excluded)) cfg.excluded = [];
+      if (!cfg.excluded.includes(p)) cfg.excluded.push(p);
+    }
     await writeConfig(cfg);
-    return cfg.roots;
+    return cfg;
   });
 
   ipcMain.handle('dialog:pickFolder', async () => {
@@ -196,7 +207,7 @@ function registerHandlers() {
 
   ipcMain.handle('repos:scan', async () => {
     const cfg = await readConfig();
-    return buildTree(cfg.roots);
+    return buildTree(cfg.roots, cfg.excluded || []);
   });
 
   // Batched dirty-state for every repo in the tree: one call from the renderer.

@@ -4,7 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('gitnest', {
   getConfig: () => ipcRenderer.invoke('config:get'),
   addRoot: (p) => ipcRenderer.invoke('roots:add', p),
-  removeRoot: (p) => ipcRenderer.invoke('roots:remove', p),
+  removeRepo: (p) => ipcRenderer.invoke('repos:remove', p),
   pickFolder: () => ipcRenderer.invoke('dialog:pickFolder'),
   scan: () => ipcRenderer.invoke('repos:scan'),
   statuses: (paths) => ipcRenderer.invoke('repos:statuses', paths),

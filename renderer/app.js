@@ -831,26 +831,15 @@ $('btn-add').addEventListener('click', async () => {
 
 $('btn-refresh').addEventListener('click', () => fullRefresh());
 
-$('btn-remove-root').addEventListener('click', async () => {
-  if (!state.selected) return;
-  let root = state.selected;
-  while (true) {
-    const parent = findParentRoot(root);
-    if (!parent) break;
-    root = parent;
-  }
-  await api.removeRoot(root);
+$('btn-remove').addEventListener('click', async () => {
+  if (!state.selected) { setResult('Select a repository in the tree first.', true); return; }
+  const p = state.selected;
+  const name = p.split('/').pop() || p;
+  if (!confirm(`Remove "${name}" from the tree?\n\nThe repository itself is not deleted. Add its folder back with + to show it again.`)) return;
+  await api.removeRepo(p);
   state.selected = null;
   await fullRefresh({ keepSelection: false });
 });
-
-function findParentRoot(repoPath) {
-  const roots = state.tree.map((n) => n.path);
-  for (const r of roots) {
-    if (repoPath !== r && repoPath.startsWith(r)) return r;
-  }
-  return null;
-}
 
 $('btn-fetch').addEventListener('click', () => runAction('Fetch', () => api.fetch(state.selected)));
 $('btn-pull').addEventListener('click', () => runAction('Pull', () => api.pull(state.selected)));
