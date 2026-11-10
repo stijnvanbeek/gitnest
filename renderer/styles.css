@@ -62,11 +62,12 @@ button:disabled { opacity: 0.45; cursor: default; }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 button.primary:hover:not(:disabled) { background: #63aaf2; }
 
-/* compact square toolbar buttons for the +, − and gear icons */
+/* compact square toolbar buttons for the +, −, ⟳ and gear icons */
 button.icon-btn {
-  width: 28px;
-  padding: 4px 0;
-  font-size: 15px;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  font-size: 30px;
   line-height: 1;
   text-align: center;
 }
