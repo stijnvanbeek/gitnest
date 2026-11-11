@@ -18,6 +18,7 @@ const state = {
   logTruncated: false, // history list hit the 100-commit display cap
   logTotal: null,      // real commit count behind the list, when known
   logSig: null,        // hash signature of the rendered log, to skip redundant rebuilds
+  logCache: new Map(), // repoPath -> { entries, truncated, total, sig }: instant history on reselect
   logQuery: '',        // history search text; filters the rows in the log list
   selection: new Set(),// change keys: "staged:<file>" | "unstaged:<file>" | "untracked:<file>"
   anchor: null,        // last clicked key, for shift-range selection
@@ -690,6 +691,14 @@ async function refreshLog() {
   state.log = (res && res.entries) || [];
   state.logTruncated = !!(res && res.truncated);
   state.logTotal = res ? res.total : null;
+  // Repo-wide history is cached per repo so the next selection can render
+  // it instantly; file-scoped and behind views are not cached.
+  if (!paths.length) {
+    state.logCache.set(state.selected, {
+      entries: state.log, truncated: state.logTruncated, total: state.logTotal,
+      sig: state.log.map((c) => c.hash).join(','),
+    });
+  }
   // A picked commit stays picked across auto-refreshes while it is still in
   // the log; clearing it here would reset the highlight and let the diff
   // pane fall back to the changes view every 5 seconds.
@@ -704,7 +713,10 @@ async function refreshLog() {
   renderLog();
 }
 
+let renderLogGeneration = 0; // invalidates in-flight chunked renders
+
 function renderLog() {
+  const gen = ++renderLogGeneration;
   state.logSig = state.log.map((c) => c.hash).join(',');
   const list = $('log-list');
   list.innerHTML = '';
@@ -729,7 +741,18 @@ function renderLog() {
     list.innerHTML = `<div class="pane-empty">No commits match "${esc(state.logQuery.trim())}".</div>`;
     return;
   }
-  for (const c of shown) {
+  // Large histories (tens of thousands of commits) are rendered in chunks:
+  // the first chunk paints immediately so selecting a large repo feels
+  // instant, the rest is appended in background slices. A newer render
+  // supersedes an in-flight one through the generation token.
+  const CHUNK = 500;
+  let i = 0;
+  const renderChunk = () => {
+    if (gen !== renderLogGeneration) return;
+    const frag = document.createDocumentFragment();
+    const end = Math.min(i + CHUNK, shown.length);
+    for (; i < end; i++) {
+    const c = shown[i];
     const row = document.createElement('div');
     row.className = 'log-row';
     row.dataset.hash = c.hash;
@@ -774,8 +797,12 @@ function renderLog() {
         setResult(`Revert failed:\n${r.error || r.output || ''}`, true);
       }
     });
-    list.appendChild(row);
-  }
+      frag.appendChild(row);
+    }
+    list.appendChild(frag);
+    if (i < shown.length) setTimeout(renderChunk, 0);
+  };
+  renderChunk();
   if (state.logTruncated) {
     const note = document.createElement('div');
     note.className = 'log-truncated';
@@ -803,15 +830,20 @@ async function refreshCounts() {
   renderTree();
 }
 
-async function fullRefresh({ keepSelection = true, showIndicator = true } = {}) {
+async function fullRefresh({ keepSelection = true, showIndicator = true, scan = true } = {}) {
   if (refreshing) return;
   refreshing = true;
   try {
     if (showIndicator) $('scan-indicator').textContent = 'Scanning…';
-    const tree = await api.scan();
-    state.tree = Array.isArray(tree) ? tree : [];
-    state.repoPaths = [];
-    collectRepoPaths(state.tree, state.repoPaths);
+    if (scan) {
+      // The tree walk is the expensive part of a refresh; the 5-second tick
+      // skips it and only the manual refresh and the slow 30-second cycle
+      // rescan, so picking a repo rarely queues behind a full scan.
+      const tree = await api.scan();
+      state.tree = Array.isArray(tree) ? tree : [];
+      state.repoPaths = [];
+      collectRepoPaths(state.tree, state.repoPaths);
+    }
     await refreshCounts();
     if (showIndicator) $('scan-indicator').textContent = '';
     if (keepSelection && state.selected && state.repoPaths.includes(state.selected)) {
@@ -832,7 +864,8 @@ async function fullRefresh({ keepSelection = true, showIndicator = true } = {}) 
 
 // Background refresh: everything the Refresh button does, every 5 seconds,
 // silently (no "Scanning…" indicator) and never overlapping a running one.
-setInterval(() => { fullRefresh({ showIndicator: false }); }, 5000);
+setInterval(() => { fullRefresh({ showIndicator: false, scan: false }); }, 5000);
+setInterval(() => { fullRefresh({ showIndicator: false }); }, 30000);
 
 // ---------- repo actions ----------
 
@@ -1198,7 +1231,14 @@ async function selectRepo(repoPath) {
   state.logTotal = null;
   state.logQuery = '';
   $('log-search').value = '';
-  state.logSig = null;
+  // Show the cached history right away so reselecting a large repo is
+  // instant; refreshLog then fetches the current one in the background.
+  const cached = state.logCache.get(repoPath);
+  state.log = cached ? cached.entries : [];
+  state.logTruncated = cached ? cached.truncated : false;
+  state.logTotal = cached ? cached.total : null;
+  state.logSig = cached ? cached.sig : null;
+  if (cached) renderLog();
   state.selection = new Set();
   state.anchor = null;
   state.changeCursor = null;
