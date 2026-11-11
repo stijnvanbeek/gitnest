@@ -489,15 +489,29 @@ async function onChangeRowClick(key, ev) {
   await syncStaging(prev);
 }
 
-// Arrow-key navigation in the changes list: Up/Down moves the selection one
-// row, shift+Up/Down extends it from the anchor like shift+click. The
-// selection is the staged set, so moving it stages and unstages as it goes.
+// Arrow-key navigation, scoped to the focused panel: in the changes list
+// Up/Down moves the selection one row (shift extends the range like
+// shift+click; the selection is the staged set, so moving it stages and
+// unstages as it goes), in the repository tree Up/Down moves the repo
+// selection. Other panels and unfocused states leave the arrows alone.
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
-  if (!state.selected || !state.rowOrder.length) return;
-  e.preventDefault();
+  const el = document.activeElement;
+  const inStatus = !!(el && el.closest && el.closest('#status-pane'));
+  const inTree = !!(el && el.closest && el.closest('#tree-pane'));
+  if (inStatus) {
+    if (!state.selected || !state.rowOrder.length) return;
+    e.preventDefault();
+    navigateChanges(e);
+  } else if (inTree) {
+    e.preventDefault();
+    navigateRepos(e);
+  }
+});
+
+function navigateChanges(e) {
   const order = state.rowOrder;
   // The cursor is the row the next arrow moves from; it follows the anchor
   // when that is a live row, otherwise navigation starts at an end of the list.
@@ -540,7 +554,21 @@ document.addEventListener('keydown', (e) => {
   syncStaging(prev);
   const row = document.querySelector(`#changes-list .change-row[data-key="${CSS.escape(key)}"]`);
   if (row) row.scrollIntoView({ block: 'nearest' });
-});
+}
+
+// Up/Down in the repository tree moves the repo selection through the repos
+// in display order.
+function navigateRepos(e) {
+  const rows = [...document.querySelectorAll('#tree .repo-name')];
+  if (!rows.length) return;
+  const paths = rows.map((r) => r.title);
+  let idx = paths.indexOf(state.selected);
+  if (idx === -1) idx = e.key === 'ArrowDown' ? -1 : paths.length;
+  const next = e.key === 'ArrowDown' ? idx + 1 : idx - 1;
+  if (next < 0 || next >= paths.length) return; // stay at the ends
+  selectRepo(paths[next]);
+  rows[next].scrollIntoView({ block: 'nearest' });
+}
 
 async function refreshStatus() {
   if (!state.selected) return;
