@@ -426,7 +426,7 @@ section:focus { outline: none; }
   flex: 1;
   overflow: auto;
   margin: 0;
-  padding: 8px 12px;
+  padding: 8px 12px 8px 0;
   font-family: ui-monospace, Menlo, monospace;
   font-size: 12px;
   line-height: 1.35;
