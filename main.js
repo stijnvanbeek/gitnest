@@ -164,6 +164,9 @@ function registerHandlers() {
   ipcMain.handle('repo:revert', (e, repo, paths) => git.revert(repo, paths));
   ipcMain.handle('repo:revertcommit', (e, repo, hash) => git.revertCommit(repo, hash));
   ipcMain.handle('repo:cherrypick', (e, repo, hash) => git.cherryPick(repo, hash));
+  ipcMain.handle('repo:stashlist', (e, repo) => git.stashList(repo));
+  ipcMain.handle('repo:stash', (e, repo, paths) => git.stash(repo, paths || []));
+  ipcMain.handle('repo:stashpop', (e, repo) => git.stashPop(repo));
 
   // Popup menu on a history row. In behind mode the action is cherry-pick,
   // otherwise revert. Every mode also offers "Copy cherry pick" (remembers

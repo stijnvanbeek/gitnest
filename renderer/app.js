@@ -697,6 +697,13 @@ async function refreshStatus() {
   if (state.selection.size && !state.selectedCommit && !state.selectedFile) await showChangesDiff();
   // during a merge a commit completes the merge even with an empty index
   $('btn-commit').disabled = !s.staged.length && !s.merging;
+  // The stash button flips to Unstash when the repo has a stash to pop.
+  const stashes = await api.stashList(state.selected);
+  const stashBtn = $('btn-stash');
+  stashBtn.textContent = stashes.length ? 'Unstash' : 'Stash';
+  stashBtn.title = stashes.length
+    ? `Apply and remove the latest stash (${stashes.length} in total)`
+    : 'Set aside the selected (staged) changes in a stash';
 }
 
 async function refreshLog() {
@@ -1231,6 +1238,46 @@ $('btn-revert').addEventListener('click', async () => {
     await fullRefresh();
   } else {
     setResult(`Revert failed:\n${r.error}`, true);
+  }
+});
+
+// Stash sets the selected (staged) changes aside (everything changed when
+// nothing is selected); Unstash applies and removes the latest stash. The
+// button label flips with the stash list, refreshed with every status.
+$('btn-stash').addEventListener('click', async () => {
+  if (!state.selected) return;
+  const stashes = await api.stashList(state.selected);
+  if (stashes.length) {
+    const r = await api.stashPop(state.selected);
+    if (r.ok) {
+      setResult('Stash applied to the working tree.', false);
+      state.selection = new Set();
+      state.anchor = null;
+      state.changeCursor = null;
+      await fullRefresh();
+    } else if (r.conflicted) {
+      setResult(`Unstash has conflicts. Conflicted files are marked with "!" in the changes list.\n${r.output || r.error}`, true);
+      await fullRefresh();
+    } else {
+      setResult(`Unstash failed:\n${r.error || r.output || ''}`, true);
+    }
+    return;
+  }
+  const s = state.lastStatus || {};
+  const conflicted = new Set((s.conflicts || []).map((c) => c.file));
+  const files = [...state.selection]
+    .map((k) => k.slice(k.indexOf(':') + 1))
+    .filter((f) => !conflicted.has(f));
+  if (state.selection.size && !files.length) { setResult('Conflicted files need manual resolution first.', true); return; }
+  const r = await api.stash(state.selected, files);
+  if (r.ok) {
+    setResult(files.length ? `Stashed ${files.length} file(s).` : 'Stashed all changes.', false);
+    state.selection = new Set();
+    state.anchor = null;
+    state.changeCursor = null;
+    await fullRefresh();
+  } else {
+    setResult(`Stash failed:\n${r.error || r.output || ''}`, true);
   }
 });
 
