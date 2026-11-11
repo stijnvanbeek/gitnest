@@ -79,16 +79,34 @@ function setResult(text, isError) {
 function setDiff(header, text) {
   $('diff-header').textContent = header;
   const lines = String(text).split('\n');
+  let oldNo = 0;
+  let newNo = 0;
   $('diff-output').innerHTML = lines.map((l) => {
     const e = esc(l);
-    if (l.startsWith('diff --git') || l.startsWith('+++') || l.startsWith('---')) {
-      return `<span class="dl-file">${e}</span>`;
+    let cls = '';
+    let oldTxt = '';
+    let newTxt = '';
+    if (l.startsWith('@@')) {
+      const m = l.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (m) { oldNo = parseInt(m[1], 10); newNo = parseInt(m[2], 10); }
+      cls = 'dl-hunk';
+    } else if (l.startsWith('diff --git') || l.startsWith('+++') || l.startsWith('---') || l.startsWith('index ')) {
+      cls = 'dl-file';
+    } else if (l.startsWith('\\')) {
+      cls = 'dl-file';
+    } else if (l.startsWith('+')) {
+      cls = 'dl-add';
+      newTxt = newNo++;
+    } else if (l.startsWith('-')) {
+      cls = 'dl-del';
+      oldTxt = oldNo++;
+    } else if (l) {
+      oldTxt = oldNo++;
+      newTxt = newNo++;
     }
-    if (l.startsWith('@@')) return `<span class="dl-hunk">${e}</span>`;
-    if (l.startsWith('+')) return `<span class="dl-add">${e}</span>`;
-    if (l.startsWith('-')) return `<span class="dl-del">${e}</span>`;
-    return e;
-  }).join('\n');
+    const gutter = `<span class="diff-gutter"><span class="diff-no">${oldTxt}</span><span class="diff-no">${newTxt}</span></span>`;
+    return `<div class="diff-row ${cls}">${gutter}<span class="diff-code">${e || ' '}</span></div>`;
+  }).join('');
 }
 
 function clearDiff(header) {

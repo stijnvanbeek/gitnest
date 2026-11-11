@@ -434,7 +434,20 @@ section:focus { outline: none; }
   tab-size: 4;
   user-select: text;
 }
-#diff-output .dl-add { color: var(--green); }
-#diff-output .dl-del { color: var(--red); }
-#diff-output .dl-hunk { color: var(--accent); }
-#diff-output .dl-file { color: var(--fg-dim); font-weight: 700; }
+#diff-output .diff-row { display: flex; }
+#diff-output .diff-gutter {
+  flex-shrink: 0;
+  display: flex;
+  padding-right: 10px;
+  margin-right: 10px;
+  border-right: 1px solid var(--border);
+  color: var(--fg-dim);
+  opacity: 0.75;
+  user-select: none;
+  text-align: right;
+}
+#diff-output .diff-no { display: inline-block; width: 4ch; }
+#diff-output .diff-row.dl-add .diff-code { color: var(--green); }
+#diff-output .diff-row.dl-del .diff-code { color: var(--red); }
+#diff-output .diff-row.dl-hunk .diff-code { color: var(--accent); }
+#diff-output .diff-row.dl-file .diff-code { color: var(--fg-dim); font-weight: 700; }
