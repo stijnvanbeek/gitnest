@@ -1,11 +1,15 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, clipboard } = require('electron');
 const { execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs/promises');
 const git = require('./lib/git');
 
 let win = null;
+
+// Last commit copied with "Copy cherry pick" in the history popup: its repo,
+// sha and time. "Paste cherry pick" uses it in any repo that has the commit.
+let cherryClipboard = null;
 
 function configPath() {
   return path.join(app.getPath('userData'), 'gitnest-config.json');
@@ -161,34 +165,55 @@ function registerHandlers() {
   ipcMain.handle('repo:revertcommit', (e, repo, hash) => git.revertCommit(repo, hash));
   ipcMain.handle('repo:cherrypick', (e, repo, hash) => git.cherryPick(repo, hash));
 
-  // Popup menu on a history row: resolves to true when the user picked
-  // "Revert", false when the menu was dismissed by clicking elsewhere.
-  ipcMain.handle('menu:revertcommit', (e, repo, hash, subject) => new Promise((resolve) => {
-    let picked = false;
-    const menu = Menu.buildFromTemplate([
-      {
-        label: `Revert commit ${hash} ("${(subject || '').slice(0, 60)}")`,
-        click: () => { picked = true; resolve(true); },
-      },
-    ]);
-    menu.on('menu-will-close', () => setTimeout(() => resolve(picked), 0));
-    menu.popup({ window: BrowserWindow.fromWebContents(e.sender) });
-  }));
-
-  // Popup menu on a row of the behind list: cherry-picks the commit from the
-  // selected branch onto the checked-out branch. Clicking elsewhere closes
-  // the menu without acting.
-  ipcMain.handle('menu:cherrypick', (e, repo, hash, subject) => new Promise((resolve) => {
-    let picked = false;
-    const menu = Menu.buildFromTemplate([
-      {
+  // Popup menu on a history row. In behind mode the action is cherry-pick,
+  // otherwise revert. Every mode also offers "Copy cherry pick" (remembers
+  // the commit and puts its sha on the clipboard) and "Paste cherry pick",
+  // enabled only when the copied commit exists in this repo (same repo or a
+  // fork/clone sharing its history). Resolves to 'revert', 'cherry', 'copy',
+  // 'paste' or null when dismissed by clicking elsewhere.
+  ipcMain.handle('menu:history', async (e, repo, hash, subject, behind) => {
+    const pasteOk = cherryClipboard
+      ? await git.canCherryPick(repo, cherryClipboard.hash) : false;
+    let picked = null;
+    const template = [];
+    if (behind) {
+      template.push({
         label: `Cherry-pick commit ${hash} ("${(subject || '').slice(0, 60)}")`,
-        click: () => { picked = true; resolve(true); },
+        click: () => { picked = 'cherry'; },
+      });
+    } else {
+      template.push({
+        label: `Revert commit ${hash} ("${(subject || '').slice(0, 60)}")`,
+        click: () => { picked = 'revert'; },
+      });
+    }
+    template.push(
+      { type: 'separator' },
+      {
+        label: 'Copy cherry pick',
+        click: () => { picked = 'copy'; },
       },
-    ]);
-    menu.on('menu-will-close', () => setTimeout(() => resolve(picked), 0));
-    menu.popup({ window: BrowserWindow.fromWebContents(e.sender) });
-  }));
+      {
+        label: `Paste cherry pick${cherryClipboard ? ` (${cherryClipboard.hash.slice(0, 8)})` : ''}`,
+        enabled: pasteOk,
+        click: () => { picked = 'paste'; },
+      },
+    );
+    return await new Promise((resolve) => {
+      const menu = Menu.buildFromTemplate(template);
+      menu.on('menu-will-close', () => setTimeout(() => resolve(picked), 0));
+      menu.popup({ window: BrowserWindow.fromWebContents(e.sender) });
+    });
+  });
+
+  // "Copy cherry pick": remember the commit for "Paste cherry pick" in any
+  // repo and put the sha on the system clipboard.
+  ipcMain.handle('cherry:copy', (e, repo, hash) => {
+    cherryClipboard = { repo, hash, time: Date.now() };
+    clipboard.writeText(hash);
+    return true;
+  });
+  ipcMain.handle('cherry:clipboard', () => cherryClipboard);
 
   // Popup menu on a changes row: commit the selection (uses the commit
   // message box) or discard its changes. Resolves to 'commit', 'revert' or

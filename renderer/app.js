@@ -784,35 +784,40 @@ function renderLog() {
       highlightLogSelection();
       showCommitDiff(c);
     });
-    // right-click: in behind mode cherry-pick the commit onto the checked-out
-    // branch, otherwise revert it with a new "Revert ..." commit
+    // right-click popup: revert (normal mode) or cherry-pick (behind mode),
+    // plus copy/paste of a commit for cherry-picking across repos
     row.addEventListener('contextmenu', async (ev) => {
       ev.preventDefault();
       if (!state.selected) return;
-      if (state.behindBranch) {
-        const go = await api.popupCherryMenu(state.selected, c.hash, c.subject);
-        if (!go) return;
-        const r = await api.cherryPick(state.selected, c.hash);
-        if (r.ok) {
-          setResult(`Cherry-picked ${c.hash} onto ${state.currentBranch}.`, false);
-          await Promise.all([refreshStatus(), refreshCounts()]);
-          await applyHistoryMode(); // the commit is now in both branches: refresh the list
-        } else if (r.conflicted) {
-          setResult(`Cherry-pick has conflicts. Conflicted files are marked with "!" in the changes list.\n${r.output || r.error}`, true);
-        } else {
-          setResult(`Cherry-pick failed:\n${r.error || r.output || ''}`, true);
+      const act = await api.popupHistoryMenu(state.selected, c.hash, c.subject, !!state.behindBranch);
+      if (!act) return;
+      if (act === 'copy') {
+        await api.copyCherry(state.selected, c.hash);
+        setResult(`Copied ${c.hash} for cherry-pick.`, false);
+        return;
+      }
+      if (act === 'paste') {
+        const clip = await api.getCherryClipboard();
+        if (!clip) return;
+        const r = await doCherryPick(clip.hash);
+        if (r && r.ok) {
+          setResult(`Cherry-picked ${clip.hash} onto ${state.currentBranch}.`, false);
         }
         return;
       }
-      const go = await api.popupRevertMenu(state.selected, c.hash, c.subject);
-      if (!go) return;
-      const r = await api.revertCommit(state.selected, c.hash);
-      if (r.ok) {
-        setResult(`Reverted ${c.hash} in a new commit.`, false);
-        await Promise.all([refreshStatus(), refreshLog(), refreshBranches()]);
-        await refreshCounts();
-      } else {
-        setResult(`Revert failed:\n${r.error || r.output || ''}`, true);
+      if (act === 'cherry') {
+        await doCherryPick(c.hash);
+        return;
+      }
+      if (act === 'revert') {
+        const r = await api.revertCommit(state.selected, c.hash);
+        if (r.ok) {
+          setResult(`Reverted ${c.hash} in a new commit.`, false);
+          await Promise.all([refreshStatus(), refreshLog(), refreshBranches()]);
+          await refreshCounts();
+        } else {
+          setResult(`Revert failed:\n${r.error || r.output || ''}`, true);
+        }
       }
     });
       frag.appendChild(row);
@@ -834,6 +839,21 @@ function renderLog() {
     note.textContent = `${shown.length.toLocaleString()} of ${state.log.length.toLocaleString()} commits match`;
     list.appendChild(note);
   }
+}
+
+// Cherry-pick a commit onto the checked-out branch and report the result.
+// Used by the behind-panel popup and by "Paste cherry pick".
+async function doCherryPick(hash) {
+  const r = await api.cherryPick(state.selected, hash);
+  if (r.ok) {
+    await Promise.all([refreshStatus(), refreshCounts()]);
+    await applyHistoryMode(); // in behind mode the commit is now in both branches
+  } else if (r.conflicted) {
+    setResult(`Cherry-pick has conflicts. Conflicted files are marked with "!" in the changes list.\n${r.output || r.error}`, true);
+  } else {
+    setResult(`Cherry-pick failed:\n${r.error || r.output || ''}`, true);
+  }
+  return r;
 }
 
 // ---------- global refresh ----------
