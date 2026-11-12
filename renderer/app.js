@@ -1350,76 +1350,87 @@ async function selectRepo(repoPath) {
 // ---------- resizable panes ----------
 
 // Drag a splitter to resize; double-click resets to the stylesheet default.
-function setupSplitters() {
-  const colResize = (splitterId, paneId) => {
-    const el = $(splitterId);
-    const pane = $(paneId);
-    el.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      el.classList.add('dragging');
-      const startX = e.clientX;
-      const startW = pane.getBoundingClientRect().width;
-      const move = (ev) => {
-        const w = Math.max(180, startW + ev.clientX - startX);
-        pane.style.flex = 'none';
-        pane.style.width = `${w}px`;
-      };
-      const up = () => {
-        el.classList.remove('dragging');
-        window.removeEventListener('mousemove', move);
-        window.removeEventListener('mouseup', up);
-      };
-      window.addEventListener('mousemove', move);
-      window.addEventListener('mouseup', up);
-    });
-    el.addEventListener('dblclick', () => { pane.style.flex = ''; pane.style.width = ''; });
-  };
-  colResize('split-tree', 'tree-pane');
-  colResize('split-status', 'status-pane');
-
-  const h = $('hsplit');
-  const top = $('log-list');
-  h.addEventListener('mousedown', (e) => {
+// Shared splitter-drag helper. The move handler is rAF-throttled so at most
+// one layout happens per frame, which keeps dragging smooth with long lists.
+function dragSplitter(el, onStart, onMove) {
+  el.addEventListener('mousedown', (e) => {
     e.preventDefault();
-    h.classList.add('dragging');
-    const startY = e.clientY;
-    const startH = top.getBoundingClientRect().height;
+    el.classList.add('dragging');
+    const s = onStart(e);
+    let raf = 0;
+    let last = null;
+    const apply = () => {
+      raf = 0;
+      if (last) onMove(s, last);
+    };
     const move = (ev) => {
-      const parentH = top.parentElement.getBoundingClientRect().height;
-      const hh = Math.min(Math.max(60, startH + ev.clientY - startY), Math.max(60, parentH - 80));
-      top.style.flex = `0 0 ${hh}px`;
+      last = ev;
+      if (!raf) raf = requestAnimationFrame(apply);
     };
     const up = () => {
-      h.classList.remove('dragging');
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      apply();
+      el.classList.remove('dragging');
       window.removeEventListener('mousemove', move);
       window.removeEventListener('mouseup', up);
     };
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
   });
-  h.addEventListener('dblclick', () => { top.style.flex = ''; });
+}
+
+// Drag a splitter to resize; double-click resets to the stylesheet default.
+function setupSplitters() {
+  dragSplitter(
+    $('split-tree'),
+    (e) => ({ pane: $('tree-pane'), startX: e.clientX, startW: $('tree-pane').getBoundingClientRect().width }),
+    (s, ev) => {
+      const w = Math.max(180, s.startW + ev.clientX - s.startX);
+      s.pane.style.flex = 'none';
+      s.pane.style.width = `${w}px`;
+    }
+  );
+  $('split-tree').addEventListener('dblclick', () => {
+    $('tree-pane').style.flex = '';
+    $('tree-pane').style.width = '';
+  });
+
+  dragSplitter(
+    $('split-status'),
+    (e) => ({ pane: $('status-pane'), startX: e.clientX, startW: $('status-pane').getBoundingClientRect().width }),
+    (s, ev) => {
+      const w = Math.max(180, s.startW + ev.clientX - s.startX);
+      s.pane.style.flex = 'none';
+      s.pane.style.width = `${w}px`;
+    }
+  );
+  $('split-status').addEventListener('dblclick', () => {
+    $('status-pane').style.flex = '';
+    $('status-pane').style.width = '';
+  });
+
+  dragSplitter(
+    $('hsplit'),
+    (e) => ({ startY: e.clientY, startH: $('log-list').getBoundingClientRect().height }),
+    (s, ev) => {
+      const top = $('log-list');
+      const parentH = top.parentElement.getBoundingClientRect().height;
+      const hh = Math.min(Math.max(60, s.startH + ev.clientY - s.startY), Math.max(60, parentH - 80));
+      top.style.flex = `0 0 ${hh}px`;
+    }
+  );
+  $('hsplit').addEventListener('dblclick', () => { $('log-list').style.flex = ''; });
 
   // splitter between the repo tree and the git op-log in the left pane
-  const h2 = $('hsplit-tree');
-  const oplog = $('oplog-pane');
-  h2.addEventListener('mousedown', (e) => {
-    e.preventDefault();
-    h2.classList.add('dragging');
-    const startY = e.clientY;
-    const startH = oplog.getBoundingClientRect().height;
-    const move = (ev) => {
-      const hh = Math.min(Math.max(60, startH - (ev.clientY - startY)), 600);
-      oplog.style.height = `${hh}px`;
-    };
-    const up = () => {
-      h2.classList.remove('dragging');
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', up);
-    };
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
-  });
-  h2.addEventListener('dblclick', () => { oplog.style.height = ''; });
+  dragSplitter(
+    $('hsplit-tree'),
+    (e) => ({ startY: e.clientY, startH: $('oplog-pane').getBoundingClientRect().height }),
+    (s, ev) => {
+      const hh = Math.min(Math.max(60, s.startH - (ev.clientY - s.startY)), 600);
+      $('oplog-pane').style.height = `${hh}px`;
+    }
+  );
+  $('hsplit-tree').addEventListener('dblclick', () => { $('oplog-pane').style.height = ''; });
 }
 
 function showTreeHint() {

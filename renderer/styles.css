@@ -451,3 +451,10 @@ section:focus { outline: none; }
 #diff-output .diff-row.dl-del .diff-code { color: var(--red); }
 #diff-output .diff-row.dl-hunk .diff-code { color: var(--accent); }
 #diff-output .diff-row.dl-file .diff-code { color: var(--fg-dim); font-weight: 700; }
+
+/* Skip layout and paint for rows that are scrolled offscreen. Keeps resizing
+   and scrolling fast with long lists (uncapped history, big trees, diffs). */
+.log-row, .oplog-row, .tree-row, .change-row, .diff-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 34px;
+}
