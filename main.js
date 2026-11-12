@@ -1,11 +1,42 @@
 'use strict';
 const { app, BrowserWindow, ipcMain, dialog, Menu, clipboard } = require('electron');
-const { execFile } = require('child_process');
+const { execFile, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs/promises');
 const git = require('./lib/git');
 
 let win = null;
+
+// On startup, terminate any other running instance of this same app first,
+// so a fresh launch never ends up next to a stale one (and never fights it
+// for the debug port). Matched by exact process name (GitNest when packaged,
+// Electron in dev), never by command line, so launcher shells that merely
+// mention the app path are not matched, and never our own pid.
+function killOtherInstances() {
+  try {
+    const name = path.basename(process.execPath);
+    const out = execSync(`pgrep -x ${name}`, { encoding: 'utf8' });
+    const others = out
+      .split('\n')
+      .map((s) => parseInt(s, 10))
+      .filter((pid) => pid && pid !== process.pid);
+    if (!others.length) return;
+    for (const pid of others) {
+      try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
+    }
+    // Give them a moment to exit so they release ports and files before we
+    // carry on starting up.
+    const deadline = Date.now() + 3000;
+    while (Date.now() < deadline) {
+      const alive = others.filter((pid) => {
+        try { process.kill(pid, 0); return true; } catch { return false; }
+      });
+      if (!alive.length) return;
+      execSync('sleep 0.1');
+    }
+  } catch { /* pgrep found nothing or the platform has no pgrep: nothing to do */ }
+}
+killOtherInstances();
 
 // Last commit copied with "Copy cherry pick" in the history popup: its repo,
 // sha and time. "Paste cherry pick" uses it in any repo that has the commit.
