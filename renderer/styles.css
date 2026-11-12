@@ -157,7 +157,9 @@ section:focus { outline: none; }
   padding: 3px 8px;
   cursor: pointer;
   white-space: nowrap;
-  overflow: hidden;
+  /* rows size to their content so the panel scrolls horizontally when a
+     name is wider than the panel, instead of truncating it */
+  min-width: max-content;
 }
 .tree-row:hover { background: var(--bg-hover); }
 .tree-row.selected { background: var(--selected); }
@@ -294,6 +296,9 @@ section:focus { outline: none; }
   gap: 8px;
   padding: 3px 12px;
   cursor: pointer;
+  /* rows size to their content so the panel scrolls horizontally when a
+     path is wider than the panel, instead of truncating it */
+  min-width: max-content;
 }
 .change-row:hover { background: var(--bg-hover); }
 .change-row.selected { background: var(--selected); }
