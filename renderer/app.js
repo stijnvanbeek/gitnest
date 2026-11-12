@@ -1259,7 +1259,12 @@ $('btn-stash').addEventListener('click', async () => {
       setResult(`Unstash has conflicts. Conflicted files are marked with "!" in the changes list.\n${r.output || r.error}`, true);
       await fullRefresh();
     } else {
-      setResult(`Unstash failed:\n${r.error || r.output || ''}`, true);
+      // git can split its failure reason over stdout and stderr; show both
+      const why = [r.error, r.output].filter(Boolean).join('\n');
+      const hint = /would be overwritten/i.test(why)
+        ? '\n\nCommit or stash your current changes first, then unstash again.'
+        : '';
+      setResult(`Unstash failed:\n${why}${hint}`, true);
     }
     return;
   }
@@ -1277,7 +1282,7 @@ $('btn-stash').addEventListener('click', async () => {
     state.changeCursor = null;
     await fullRefresh();
   } else {
-    setResult(`Stash failed:\n${r.error || r.output || ''}`, true);
+    setResult(`Stash failed:\n${[r.error, r.output].filter(Boolean).join('\n')}`, true);
   }
 });
 
