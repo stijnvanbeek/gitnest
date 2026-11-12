@@ -658,72 +658,6 @@ async function refreshStatus() {
     }
     row.addEventListener('click', (ev) => onChangeRowClick(selKey, ev));
     row.addEventListener('dblclick', () => openInEditor(state.selected, item.file));
-    row.addEventListener('contextmenu', async (ev) => {
-      ev.preventDefault();
-      // Right-clicking a row outside the selection selects it first (standard
-      // behaviour), so the menu acts on what the user pointed at.
-      if (!state.selection.has(selKey)) {
-        const prev = new Set(state.selection);
-        state.selection = new Set([selKey]);
-        state.anchor = selKey;
-        applySelectionHighlight();
-        updateSelToolbar();
-        showChangesDiff();
-        await syncStaging(prev);
-      }
-      const act = await api.popupChangesMenu(state.selected, state.selection.size);
-      if (act === 'commit') {
-        if (!$('btn-commit').disabled) $('btn-commit').click();
-      } else if (act === 'revert') {
-        $('btn-revert').click();
-      } else if (act === 'stash') {
-        const conflicted = new Set(((state.lastStatus || {}).conflicts || []).map((c) => c.file));
-        const files = [...state.selection]
-          .map((k) => k.slice(k.indexOf(':') + 1))
-          .filter((f) => !conflicted.has(f));
-        if (!files.length) { setResult('Conflicted files need manual resolution first.', true); return; }
-        const r = await api.stash(state.selected, files);
-        if (r.ok) {
-          setResult(`Stashed ${files.length} file(s).`, false);
-          state.selection = new Set();
-          state.anchor = null;
-          state.changeCursor = null;
-          await fullRefresh();
-        } else {
-          setResult(`Stash failed:\n${[r.error, r.output].filter(Boolean).join('\n')}`, true);
-        }
-      } else if (act === 'unstash') {
-        const r = await api.stashPop(state.selected);
-        if (r.ok) {
-          setResult('Stash applied to the working tree.', false);
-          state.selection = new Set();
-          state.anchor = null;
-          state.changeCursor = null;
-          await fullRefresh();
-        } else if (r.conflicted) {
-          setResult(`Unstash has conflicts. Conflicted files are marked with "!" in the changes list.\n${r.output || r.error}`, true);
-          await fullRefresh();
-        } else {
-          // git can split its failure reason over stdout and stderr; show both
-          const why = [r.error, r.output].filter(Boolean).join('\n');
-          const hint = /would be overwritten/i.test(why)
-            ? '\n\nCommit or stash your current changes first, then unstash again.'
-            : '';
-          setResult(`Unstash failed:\n${why}${hint}`, true);
-        }
-      } else if (act === 'drop') {
-        const stashes = await api.stashList(state.selected);
-        if (!stashes.length) return;
-        if (!confirm(`Discard the latest stash?\n\n${stashes[0]}\n\nThis cannot be undone.`)) return;
-        const r = await api.stashDrop(state.selected);
-        if (r.ok) {
-          setResult('Stash discarded.', false);
-          await refreshStatus();
-        } else {
-          setResult(`Discard failed:\n${[r.error, r.output].filter(Boolean).join('\n')}`, true);
-        }
-      }
-    });
     list.appendChild(row);
   }
 
@@ -1301,6 +1235,76 @@ $('log-search').addEventListener('keydown', (e) => {
     state.logQuery = '';
     renderLog();
     $('log-search').blur();
+  }
+});
+
+// Right-click anywhere in the status panel shows the changes popup. When the
+// click lands on a change row outside the selection, that row is selected
+// first (standard behaviour), so the menu acts on what was pointed at.
+$('status-pane').addEventListener('contextmenu', async (ev) => {
+  ev.preventDefault();
+  if (!state.selected) return;
+  const row = ev.target.closest('.change-row');
+  if (row && !state.selection.has(row.dataset.key)) {
+    const prev = new Set(state.selection);
+    state.selection = new Set([row.dataset.key]);
+    state.anchor = row.dataset.key;
+    applySelectionHighlight();
+    updateSelToolbar();
+    showChangesDiff();
+    await syncStaging(prev);
+  }
+  const act = await api.popupChangesMenu(state.selected, state.selection.size);
+  if (act === 'commit') {
+    if (!$('btn-commit').disabled) $('btn-commit').click();
+  } else if (act === 'revert') {
+    $('btn-revert').click();
+  } else if (act === 'stash') {
+    const conflicted = new Set(((state.lastStatus || {}).conflicts || []).map((c) => c.file));
+    const files = [...state.selection]
+      .map((k) => k.slice(k.indexOf(':') + 1))
+      .filter((f) => !conflicted.has(f));
+    if (!files.length) { setResult('Conflicted files need manual resolution first.', true); return; }
+    const r = await api.stash(state.selected, files);
+    if (r.ok) {
+      setResult(`Stashed ${files.length} file(s).`, false);
+      state.selection = new Set();
+      state.anchor = null;
+      state.changeCursor = null;
+      await fullRefresh();
+    } else {
+      setResult(`Stash failed:\n${[r.error, r.output].filter(Boolean).join('\n')}`, true);
+    }
+  } else if (act === 'unstash') {
+    const r = await api.stashPop(state.selected);
+    if (r.ok) {
+      setResult('Stash applied to the working tree.', false);
+      state.selection = new Set();
+      state.anchor = null;
+      state.changeCursor = null;
+      await fullRefresh();
+    } else if (r.conflicted) {
+      setResult(`Unstash has conflicts. Conflicted files are marked with "!" in the changes list.\n${r.output || r.error}`, true);
+      await fullRefresh();
+    } else {
+      // git can split its failure reason over stdout and stderr; show both
+      const why = [r.error, r.output].filter(Boolean).join('\n');
+      const hint = /would be overwritten/i.test(why)
+        ? '\n\nCommit or stash your current changes first, then unstash again.'
+        : '';
+      setResult(`Unstash failed:\n${why}${hint}`, true);
+    }
+  } else if (act === 'drop') {
+    const stashes = await api.stashList(state.selected);
+    if (!stashes.length) return;
+    if (!confirm(`Discard the latest stash?\n\n${stashes[0]}\n\nThis cannot be undone.`)) return;
+    const r = await api.stashDrop(state.selected);
+    if (r.ok) {
+      setResult('Stash discarded.', false);
+      await refreshStatus();
+    } else {
+      setResult(`Discard failed:\n${[r.error, r.output].filter(Boolean).join('\n')}`, true);
+    }
   }
 });
 
