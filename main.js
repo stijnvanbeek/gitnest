@@ -169,35 +169,6 @@ function registerHandlers() {
   ipcMain.handle('repo:stashpop', (e, repo) => git.stashPop(repo));
   ipcMain.handle('repo:stashdrop', (e, repo) => git.stashDrop(repo));
 
-  // Popup menu on the diff panel: stash the selection, unstash (apply and
-  // remove the latest stash) or discard the stash. Resolves to 'stash',
-  // 'unstash', 'drop' or null when dismissed by clicking elsewhere.
-  ipcMain.handle('menu:diff', async (e, repo, n) => {
-    const stashes = await git.stashList(repo);
-    return await new Promise((resolve) => {
-      let picked = null;
-      const template = [
-        {
-          label: n ? `Stash ${n} selected file(s)` : 'Stash',
-          enabled: !!n,
-          click: () => { picked = 'stash'; },
-        },
-        {
-          label: `Unstash${stashes.length ? ` (${stashes.length} in total)` : ''}`,
-          enabled: !!stashes.length,
-          click: () => { picked = 'unstash'; },
-        },
-        {
-          label: `Discard stash${stashes.length ? ` (${stashes.length} in total)` : ''}`,
-          enabled: !!stashes.length,
-          click: () => { picked = 'drop'; },
-        },
-      ];
-      const menu = Menu.buildFromTemplate(template);
-      menu.on('menu-will-close', () => setTimeout(() => resolve(picked), 0));
-      menu.popup({ window: BrowserWindow.fromWebContents(e.sender) });
-    });
-  });
 
   // Popup menu on a history row. In behind mode the action is cherry-pick,
   // otherwise revert. Every mode also offers "Copy cherry pick" (remembers
@@ -251,16 +222,25 @@ function registerHandlers() {
 
   // Popup menu on a changes row: commit the selection (uses the commit
   // message box) or discard its changes. Resolves to 'commit', 'revert' or
-  // null when dismissed by clicking elsewhere.
-  ipcMain.handle('menu:changes', (e, n) => new Promise((resolve) => {
-    let picked = null;
-    const menu = Menu.buildFromTemplate([
-      { label: `Commit ${n} file(s)`, click: () => { picked = 'commit'; resolve(picked); } },
-      { label: `Revert changes in ${n} file(s)`, click: () => { picked = 'revert'; resolve(picked); } },
-    ]);
-    menu.on('menu-will-close', () => setTimeout(() => resolve(picked), 0));
-    menu.popup({ window: BrowserWindow.fromWebContents(e.sender) });
-  }));
+  // Popup menu on the changes list: commit, revert, and stash actions.
+  // Stash sets ONLY the selected (staged) files aside; Unstash applies and
+  // removes the latest stash; Discard throws the latest stash away.
+  ipcMain.handle('menu:changes', async (e, repo, n) => {
+    const stashes = await git.stashList(repo);
+    return await new Promise((resolve) => {
+      let picked = null;
+      const menu = Menu.buildFromTemplate([
+        { label: `Commit ${n} file(s)`, click: () => { picked = 'commit'; } },
+        { label: `Revert changes in ${n} file(s)`, click: () => { picked = 'revert'; } },
+        { type: 'separator' },
+        { label: n ? `Stash ${n} selected file(s)` : 'Stash', enabled: !!n, click: () => { picked = 'stash'; } },
+        { label: `Unstash${stashes.length ? ` (${stashes.length} in total)` : ''}`, enabled: !!stashes.length, click: () => { picked = 'unstash'; } },
+        { label: `Discard stash${stashes.length ? ` (${stashes.length} in total)` : ''}`, enabled: !!stashes.length, click: () => { picked = 'drop'; } },
+      ]);
+      menu.on('menu-will-close', () => setTimeout(() => resolve(picked), 0));
+      menu.popup({ window: BrowserWindow.fromWebContents(e.sender) });
+    });
+  });
 
   ipcMain.handle('repo:openineditor', (e, repo, relPath) => openInEditor(repo, relPath));
 
