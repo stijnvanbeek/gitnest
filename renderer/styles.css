@@ -450,7 +450,7 @@ section:focus { outline: none; }
   tab-size: 4;
   user-select: text;
 }
-#diff-output .diff-row { display: flex; }
+#diff-output .diff-row { display: flex; min-width: max-content; }
 #diff-output .diff-gutter {
   flex-shrink: 0;
   display: flex;
