@@ -7,28 +7,34 @@ const git = require('./lib/git');
 
 let win = null;
 
-// On startup, terminate any other running instance of this same app first,
-// so a fresh launch never ends up next to a stale one (and never fights it
-// for the debug port). Matched by exact process name (GitNest when packaged,
-// Electron in dev), never by command line, so launcher shells that merely
-// mention the app path are not matched, and never our own pid.
+// On startup, terminate every process of any other running instance of this
+// app first: its main process and all of its helpers (GPU, renderer,
+// network), so a fresh launch never ends up next to a stale one and never
+// fights it for the debug port. Candidates come from the command line, but a
+// pid is only killed when its executable really is one of the app's own
+// binaries, so launcher shells that merely mention the app path are not
+// touched. Our own pid is never killed.
 function killOtherInstances() {
   try {
-    const name = path.basename(process.execPath);
-    const out = execSync(`pgrep -x ${name}`, { encoding: 'utf8' });
-    const others = out
+    const out = execSync('pgrep -f "GitNest.app/Contents/"', { encoding: 'utf8' });
+    const pids = out
       .split('\n')
       .map((s) => parseInt(s, 10))
       .filter((pid) => pid && pid !== process.pid);
-    if (!others.length) return;
-    for (const pid of others) {
-      try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
+    const killed = [];
+    for (const pid of pids) {
+      let comm = '';
+      try { comm = execSync(`ps -o comm= -p ${pid}`, { encoding: 'utf8' }).trim(); } catch { continue; }
+      if (comm.includes('GitNest.app/Contents/')) {
+        try { process.kill(pid, 'SIGTERM'); killed.push(pid); } catch { /* already gone */ }
+      }
     }
+    if (!killed.length) return;
     // Give them a moment to exit so they release ports and files before we
     // carry on starting up.
     const deadline = Date.now() + 3000;
     while (Date.now() < deadline) {
-      const alive = others.filter((pid) => {
+      const alive = killed.filter((pid) => {
         try { process.kill(pid, 0); return true; } catch { return false; }
       });
       if (!alive.length) return;
