@@ -697,13 +697,6 @@ async function refreshStatus() {
   if (state.selection.size && !state.selectedCommit && !state.selectedFile) await showChangesDiff();
   // during a merge a commit completes the merge even with an empty index
   $('btn-commit').disabled = !s.staged.length && !s.merging;
-  // The stash button flips to Unstash when the repo has a stash to pop.
-  const stashes = await api.stashList(state.selected);
-  const stashBtn = $('btn-stash');
-  stashBtn.textContent = stashes.length ? 'Unstash' : 'Stash';
-  stashBtn.title = stashes.length
-    ? `Apply and remove the latest stash (${stashes.length} in total)`
-    : 'Set aside the selected (staged) changes in a stash';
 }
 
 async function refreshLog() {
@@ -1241,13 +1234,34 @@ $('btn-revert').addEventListener('click', async () => {
   }
 });
 
-// Stash sets the selected (staged) changes aside (everything changed when
-// nothing is selected); Unstash applies and removes the latest stash. The
-// button label flips with the stash list, refreshed with every status.
-$('btn-stash').addEventListener('click', async () => {
+// Stash/unstash/discard live in the right-click popup on the diff panel.
+// Stash sets ONLY the selected (staged) files aside; Unstash applies and
+// removes the latest stash; Discard throws the latest stash away.
+$('diff-pane').addEventListener('contextmenu', async (ev) => {
+  ev.preventDefault();
   if (!state.selected) return;
-  const stashes = await api.stashList(state.selected);
-  if (stashes.length) {
+  const act = await api.popupDiffMenu(state.selected, state.selection.size);
+  if (!act) return;
+  if (act === 'stash') {
+    const s = state.lastStatus || {};
+    const conflicted = new Set((s.conflicts || []).map((c) => c.file));
+    const files = [...state.selection]
+      .map((k) => k.slice(k.indexOf(':') + 1))
+      .filter((f) => !conflicted.has(f));
+    if (!files.length) { setResult('Conflicted files need manual resolution first.', true); return; }
+    const r = await api.stash(state.selected, files);
+    if (r.ok) {
+      setResult(`Stashed ${files.length} file(s).`, false);
+      state.selection = new Set();
+      state.anchor = null;
+      state.changeCursor = null;
+      await fullRefresh();
+    } else {
+      setResult(`Stash failed:\n${[r.error, r.output].filter(Boolean).join('\n')}`, true);
+    }
+    return;
+  }
+  if (act === 'unstash') {
     const r = await api.stashPop(state.selected);
     if (r.ok) {
       setResult('Stash applied to the working tree.', false);
@@ -1268,21 +1282,17 @@ $('btn-stash').addEventListener('click', async () => {
     }
     return;
   }
-  const s = state.lastStatus || {};
-  const conflicted = new Set((s.conflicts || []).map((c) => c.file));
-  const files = [...state.selection]
-    .map((k) => k.slice(k.indexOf(':') + 1))
-    .filter((f) => !conflicted.has(f));
-  if (state.selection.size && !files.length) { setResult('Conflicted files need manual resolution first.', true); return; }
-  const r = await api.stash(state.selected, files);
-  if (r.ok) {
-    setResult(files.length ? `Stashed ${files.length} file(s).` : 'Stashed all changes.', false);
-    state.selection = new Set();
-    state.anchor = null;
-    state.changeCursor = null;
-    await fullRefresh();
-  } else {
-    setResult(`Stash failed:\n${[r.error, r.output].filter(Boolean).join('\n')}`, true);
+  if (act === 'drop') {
+    const stashes = await api.stashList(state.selected);
+    if (!stashes.length) return;
+    if (!confirm(`Discard the latest stash?\n\n${stashes[0]}\n\nThis cannot be undone.`)) return;
+    const r = await api.stashDrop(state.selected);
+    if (r.ok) {
+      setResult('Stash discarded.', false);
+      await refreshStatus();
+    } else {
+      setResult(`Discard failed:\n${[r.error, r.output].filter(Boolean).join('\n')}`, true);
+    }
   }
 });
 

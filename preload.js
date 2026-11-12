@@ -32,6 +32,8 @@ contextBridge.exposeInMainWorld('gitnest', {
   stashList: (repo) => ipcRenderer.invoke('repo:stashlist', repo),
   stash: (repo, paths) => ipcRenderer.invoke('repo:stash', repo, paths),
   stashPop: (repo) => ipcRenderer.invoke('repo:stashpop', repo),
+  stashDrop: (repo) => ipcRenderer.invoke('repo:stashdrop', repo),
+  popupDiffMenu: (repo, n) => ipcRenderer.invoke('menu:diff', repo, n),
   popupHistoryMenu: (repo, hash, subject, behind) => ipcRenderer.invoke('menu:history', repo, hash, subject, behind),
   copyCherry: (repo, hash) => ipcRenderer.invoke('cherry:copy', repo, hash),
   getCherryClipboard: () => ipcRenderer.invoke('cherry:clipboard'),
