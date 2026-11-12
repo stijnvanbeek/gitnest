@@ -1238,10 +1238,11 @@ $('log-search').addEventListener('keydown', (e) => {
   }
 });
 
-// Right-click anywhere in the status panel shows the changes popup. When the
-// click lands on a change row outside the selection, that row is selected
-// first (standard behaviour), so the menu acts on what was pointed at.
-$('status-pane').addEventListener('contextmenu', async (ev) => {
+// Right-click anywhere in the changes list shows the changes popup, also when
+// the list is empty. When the click lands on a change row outside the
+// selection, that row is selected first (standard behaviour), so the menu
+// acts on what was pointed at.
+$('changes-list').addEventListener('contextmenu', async (ev) => {
   ev.preventDefault();
   if (!state.selected) return;
   const row = ev.target.closest('.change-row');
