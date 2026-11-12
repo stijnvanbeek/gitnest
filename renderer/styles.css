@@ -84,9 +84,10 @@ section { display: flex; flex-direction: column; min-height: 0; }
 /* the panes are click-focusable (tabindex=-1) so the arrow keys can be
    scoped to the focused panel; no focus ring, the selection shows where you are */
 section:focus { outline: none; }
-#tree-pane   { width: 30%; min-width: 260px; border-right: 1px solid var(--border); }
-#status-pane { width: 36%; min-width: 320px; border-right: 1px solid var(--border); }
-#history-pane { flex: 1; min-width: 300px; }
+/* default column split 1:2:3 (tree:status:history) */
+#tree-pane   { width: 16.7%; border-right: 1px solid var(--border); }
+#status-pane { width: 33.3%; border-right: 1px solid var(--border); }
+#history-pane { flex: 1; }
 
 .pane-header {
   padding: 6px 12px;
