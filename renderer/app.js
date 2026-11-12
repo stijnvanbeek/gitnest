@@ -20,6 +20,7 @@ const state = {
   logSig: null,        // hash signature of the rendered log, to skip redundant rebuilds
   logCache: new Map(), // repoPath -> { entries, truncated, total, sig }: instant history on reselect
   logQuery: '',        // history search text; filters the rows in the log list
+  unpushed: new Set(), // short hashes of commits the push target does not have yet
   selection: new Set(),// change keys: "staged:<file>" | "unstaged:<file>" | "untracked:<file>"
   anchor: null,        // last clicked key, for shift-range selection
   rowOrder: [],        // keys in display order, for shift-range selection
@@ -685,7 +686,8 @@ async function refreshLog() {
   // File-scoped history: keep refreshing the selected file's log so the view
   // stays fresh without falling back to the repo-wide history.
   const paths = state.selectedFile ? [state.selectedFile] : [];
-  const res = await api.log(state.selected, paths);
+  const [res, unp] = await Promise.all([api.log(state.selected, paths), api.unpushed(state.selected)]);
+  state.unpushed = new Set(unp || []);
   state.log = (res && res.entries) || [];
   state.logTruncated = !!(res && res.truncated);
   state.logTotal = res ? res.total : null;
@@ -756,9 +758,11 @@ function renderLog() {
     row.dataset.hash = c.hash;
     if (state.selectedCommit === c.hash) row.classList.add('selected');
     const tagBadges = (c.tags || []).map((t) => `<span class="tag-badge">${esc(t)}</span>`).join('');
+    const unpushed = !state.behindBranch && state.unpushed.has(c.hash)
+      ? '<span class="unpushed-arrow" title="Not pushed yet">↑</span>' : '';
     row.innerHTML = `
       <div class="subject">${tagBadges}${esc(c.subject)}</div>
-      <div class="meta"><span class="hash">${esc(c.hash)}</span> · ${esc(c.author)} · ${esc(relDate(c.date))}</div>`;
+      <div class="meta"><span class="hash">${esc(c.hash)}</span> · ${esc(c.author)} · ${esc(relDate(c.date))}</div>${unpushed}`;
     row.addEventListener('click', () => {
       state.selectedCommit = c.hash;
       highlightLogSelection();
@@ -1328,6 +1332,7 @@ async function selectRepo(repoPath) {
   state.logTotal = cached ? cached.total : null;
   state.logSig = cached ? cached.sig : null;
   if (cached) renderLog();
+  state.unpushed = new Set();
   state.selection = new Set();
   state.anchor = null;
   state.changeCursor = null;

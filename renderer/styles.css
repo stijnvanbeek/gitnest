@@ -393,9 +393,20 @@ section:focus { outline: none; }
 #log-search::placeholder { color: var(--fg-dim); }
 
 .log-row {
-  padding: 5px 12px;
+  padding: 5px 26px 5px 12px;
   cursor: pointer;
   border-bottom: 1px solid #262a33;
+  position: relative;
+}
+.unpushed-arrow {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--orange);
+  font-size: 14px;
+  font-weight: 700;
+  pointer-events: none;
 }
 .log-row:hover { background: var(--bg-hover); }
 .log-row.selected { background: var(--selected); }

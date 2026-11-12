@@ -270,6 +270,7 @@ function registerHandlers() {
   ipcMain.handle('repo:pull', (e, repo) => git.pull(repo));
   ipcMain.handle('repo:fetch', (e, repo) => git.fetchAll(repo));
   ipcMain.handle('repo:log', (e, repo, paths) => git.log(repo, 0, paths || []));
+  ipcMain.handle('repo:unpushed', (e, repo) => git.unpushedHashes(repo));
   ipcMain.handle('repo:logrange', (e, repo, range) => git.logRange(repo, range));
   ipcMain.handle('repo:show', (e, repo, hash) => git.show(repo, hash));
   ipcMain.handle('repo:diff', (e, repo, paths, cached) => git.diff(repo, paths, cached));
