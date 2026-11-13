@@ -1169,10 +1169,9 @@ function appendOpRow(entry) {
   if (empty) empty.remove();
   const row = document.createElement('div');
   row.className = `oplog-row ${entry.ok ? 'ok' : 'fail'}`;
-  const time = entry.time ? new Date(entry.time).toLocaleTimeString() : '';
   row.title = `${entry.command}\n${entry.response || '(no output)'}`;
   row.innerHTML =
-    `<span class="op-meta">${esc(time)} · ${esc(entry.repo || '')}</span>` +
+    `<span class="op-meta">${esc(entry.repo || '')}</span>` +
     `<span class="op-cmd">${esc(entry.command)}</span>` +
     (entry.response ? `<span class="op-resp"> — ${esc(entry.response)}</span>` : '');
   list.prepend(row);
