@@ -79,10 +79,13 @@ function setResult(text, isError) {
 
 function setDiff(header, text) {
   $('diff-header').textContent = header;
+  const out = $('diff-output');
+  const outTop = out.scrollTop;
+  const outLeft = out.scrollLeft;
   const lines = String(text).split('\n');
   let oldNo = 0;
   let newNo = 0;
-  $('diff-output').innerHTML = lines.map((l) => {
+  out.innerHTML = lines.map((l) => {
     const e = esc(l);
     let cls = '';
     let oldTxt = '';
@@ -108,6 +111,8 @@ function setDiff(header, text) {
     const gutter = `<span class="diff-gutter"><span class="diff-no">${oldTxt}</span><span class="diff-no">${newTxt}</span></span>`;
     return `<div class="diff-row ${cls}">${gutter}<span class="diff-code">${e || ' '}</span></div>`;
   }).join('');
+  out.scrollTop = outTop;
+  out.scrollLeft = outLeft;
 }
 
 function clearDiff(header) {
@@ -275,10 +280,23 @@ function renderFileTree(container, node, repoPath, prefix, depth) {
 
 // ---------- repo tree ----------
 
+// Rebuilding a list with innerHTML='' resets its scroll position, which made
+// the scrollbars jump on every 5-second auto-refresh. Save and restore around
+// the rebuild.
+function preserveScroll(el, rebuild) {
+  const top = el.scrollTop;
+  const left = el.scrollLeft;
+  rebuild();
+  el.scrollTop = top;
+  el.scrollLeft = left;
+}
+
 function renderTree() {
-  const container = $('tree');
-  container.innerHTML = '';
-  renderTreeNodes(container, state.tree, 0);
+  preserveScroll($('tree'), () => {
+    const container = $('tree');
+    container.innerHTML = '';
+    renderTreeNodes(container, state.tree, 0);
+  });
 }
 
 function renderTreeNodes(container, nodes, depth) {
@@ -595,6 +613,8 @@ async function refreshStatus() {
   const s = await api.status(state.selected);
   state.lastStatus = s;
   const list = $('changes-list');
+  const listTop = list.scrollTop;
+  const listLeft = list.scrollLeft;
   list.innerHTML = '';
   state.rowOrder = [];
 
@@ -603,6 +623,8 @@ async function refreshStatus() {
     $('repo-branch').textContent = '';
     reconcileSelection([]);
     updateSelToolbar();
+    list.scrollTop = listTop;
+    list.scrollLeft = listLeft;
     return;
   }
 
@@ -678,6 +700,8 @@ async function refreshStatus() {
   if (state.selection.size && !state.selectedCommit && !state.selectedFile) await showChangesDiff();
   // during a merge a commit completes the merge even with an empty index
   $('btn-commit').disabled = !s.staged.length && !s.merging;
+  list.scrollTop = listTop;
+  list.scrollLeft = listLeft;
 }
 
 async function refreshLog() {
@@ -719,6 +743,8 @@ function renderLog() {
   const gen = ++renderLogGeneration;
   state.logSig = state.log.map((c) => c.hash).join(',');
   const list = $('log-list');
+  const listTop = list.scrollTop;
+  const listLeft = list.scrollLeft;
   list.innerHTML = '';
   if (!state.log.length) {
     list.innerHTML = state.behindBranch
@@ -810,6 +836,10 @@ function renderLog() {
     if (i < shown.length) setTimeout(renderChunk, 0);
   };
   renderChunk();
+  // the first chunk is in, so the content is tall enough to hold the old
+  // scroll position; later chunks append below and never move it
+  list.scrollTop = listTop;
+  list.scrollLeft = listLeft;
   if (state.logTruncated) {
     const note = document.createElement('div');
     note.className = 'log-truncated';
