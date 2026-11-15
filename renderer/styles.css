@@ -474,8 +474,10 @@ section:focus { outline: none; }
 #diff-output .diff-row.dl-file .diff-code { color: var(--fg-dim); font-weight: 700; }
 
 /* Skip layout and paint for rows that are scrolled offscreen. Keeps resizing
-   and scrolling fast with long lists (uncapped history, big trees, diffs). */
-.log-row, .oplog-row, .tree-row, .change-row, .diff-row {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 34px;
-}
+   and scrolling fast with long lists (uncapped history, big trees, diffs).
+   Each row type gets its real height as the estimate: a wrong estimate makes
+   the total content height change as rows render and unrender, which shifts
+   the content under the user and looks like the scrollbar jumps. */
+.log-row, .oplog-row          { content-visibility: auto; contain-intrinsic-size: auto 40px; }
+.tree-row, .change-row        { content-visibility: auto; contain-intrinsic-size: auto 21px; }
+.diff-row                     { content-visibility: auto; contain-intrinsic-size: auto 16px; }
