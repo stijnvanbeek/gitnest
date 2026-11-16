@@ -733,7 +733,8 @@ async function refreshStatus() {
   updateSelToolbar();
   // Auto-refresh must not steal the diff pane back from a picked commit or
   // tree file; clicking a change row hands it back to the changes diff.
-  if (state.selection.size && !state.selectedCommit && !state.selectedFile) await showChangesDiff();
+  // The behind view owns the diff pane too: it shows the branch diff there.
+  if (state.selection.size && !state.selectedCommit && !state.selectedFile && !state.behindBranch) await showChangesDiff();
   // during a merge a commit completes the merge even with an empty index
   $('btn-commit').disabled = !s.staged.length && !s.merging;
   // Width fallback for the skipped rows (see maxTextWidth): status letter,
@@ -1110,10 +1111,19 @@ async function applyHistoryMode() {
   highlightLogSelection();
   renderLog();
   const behind = state.logTotal != null ? state.logTotal : state.log.length;
-  setDiff(`Commits in ${picked} not in ${state.currentBranch}`,
-    state.logError ? `error: ${state.logError}`
-      : behind ? `${behind} commit(s) will be merged into ${state.currentBranch}. Select one to see its diff.`
-        : 'Already up to date: nothing to merge.');
+  if (state.behindBranch !== picked) return; // selection changed while fetching
+  if (state.logError || !behind) {
+    setDiff(`Commits in ${picked} not in ${state.currentBranch}`,
+      state.logError ? `error: ${state.logError}` : 'Already up to date: nothing to merge.');
+    return;
+  }
+  // Show the full diff the compared branch would bring into the current one
+  // (three-dot: the changes on the picked side since the merge base).
+  setDiff(`Diff ${state.currentBranch}...${picked}`, 'Loading…');
+  const dr = await api.branchDiff(state.selected, state.currentBranch, picked);
+  if (state.behindBranch !== picked) return; // selection changed while fetching
+  setDiff(`Diff ${state.currentBranch}...${picked}`,
+    dr.error ? `error: ${dr.error}` : (dr.text || '(no differences)'));
 }
 
 // Back to the normal history view after behind mode: file history when a tree

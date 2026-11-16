@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('gitnest', {
   show: (repo, hash) => ipcRenderer.invoke('repo:show', repo, hash),
   diff: (repo, paths, cached) => ipcRenderer.invoke('repo:diff', repo, paths, cached),
   commitDiff: (repo, hash, paths) => ipcRenderer.invoke('repo:commitdiff', repo, hash, paths),
+  branchDiff: (repo, from, to) => ipcRenderer.invoke('repo:branchdiff', repo, from, to),
   branches: (repo) => ipcRenderer.invoke('repo:branches', repo),
   checkout: (repo, name) => ipcRenderer.invoke('repo:checkout', repo, name),
   createBranch: (repo, name) => ipcRenderer.invoke('repo:createbranch', repo, name),

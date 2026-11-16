@@ -312,6 +312,7 @@ function registerHandlers() {
   ipcMain.handle('repo:show', (e, repo, hash) => git.show(repo, hash));
   ipcMain.handle('repo:diff', (e, repo, paths, cached) => git.diff(repo, paths, cached));
   ipcMain.handle('repo:commitdiff', (e, repo, hash, paths) => git.commitDiff(repo, hash, paths || []));
+  ipcMain.handle('repo:branchdiff', (e, repo, from, to) => git.branchDiff(repo, from, to));
 }
 
 function createWindow() {
