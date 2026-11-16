@@ -86,7 +86,7 @@ section { display: flex; flex-direction: column; min-height: 0; }
 section:focus { outline: none; }
 /* default column split 1:2:3 (tree:status:history) */
 #tree-pane   { width: 16.7%; border-right: 1px solid var(--border); }
-#status-pane { width: 33.3%; border-right: 1px solid var(--border); }
+#status-pane { width: 16.65%; border-right: 1px solid var(--border); }
 /* min-width: 0 keeps the wide diff rows (min-width: max-content) from
    inflating this pane's min-content width and blowing out the column split */
 #history-pane { flex: 1; min-width: 0; }
@@ -230,6 +230,7 @@ section:focus { outline: none; }
   margin-top: 8px;
   align-items: center;
 }
+#branch-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 #branch-select {
   flex: 1;
   min-width: 0;

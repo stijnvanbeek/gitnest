@@ -44,11 +44,13 @@
           </div>
           <div id="branch-bar">
             <select id="branch-select" title="Current branch"></select>
+            <input id="branch-name" placeholder="new branch name" hidden>
+          </div>
+          <div id="branch-actions">
             <button id="btn-checkout" title="Check out the selected branch">Checkout</button>
             <button id="btn-new-branch" title="Create a new branch and check it out">New…</button>
             <button id="btn-delete-branch" title="Delete the selected branch (local only)">Delete</button>
             <button id="btn-merge" title="Merge the selected branch into the current one">Merge</button>
-            <input id="branch-name" placeholder="new branch name" hidden>
           </div>
         </div>
         <div id="changes-list"></div>
