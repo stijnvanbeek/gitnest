@@ -484,9 +484,13 @@ section:focus { outline: none; }
    and scrolling fast with long lists (uncapped history, big trees, diffs).
    Each row type gets its real height as the estimate: a wrong estimate makes
    the total content height change as rows render and unrender, which shifts
-   the content under the user and looks like the scrollbar jumps. */
+   the content under the user and looks like the scrollbar jumps. Rows that
+   size to their content (tree, change, diff) also need a width fallback: the
+   rebuild code sets --*-row-w to the widest real row, because with the small
+   default the widest row drops out of scrollWidth straight after a rebuild
+   and the restored horizontal scroll clamps back to 0. */
 .log-row                       { content-visibility: auto; contain-intrinsic-size: auto 40px; }
 .oplog-row                     { content-visibility: auto; contain-intrinsic-size: auto 21px; }
-.tree-row                      { content-visibility: auto; contain-intrinsic-size: auto 22px; }
-.change-row                    { content-visibility: auto; contain-intrinsic-size: auto 21px; }
-.diff-row                      { content-visibility: auto; contain-intrinsic-size: auto 16px; }
+.tree-row                      { content-visibility: auto; contain-intrinsic-size: auto var(--tree-row-w, 22px) auto 22px; }
+.change-row                    { content-visibility: auto; contain-intrinsic-size: auto var(--change-row-w, 21px) auto 21px; }
+.diff-row                      { content-visibility: auto; contain-intrinsic-size: auto var(--diff-row-w, 16px) auto 16px; }

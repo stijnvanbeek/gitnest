@@ -111,6 +111,12 @@ function setDiff(header, text) {
     const gutter = `<span class="diff-gutter"><span class="diff-no">${oldTxt}</span><span class="diff-no">${newTxt}</span></span>`;
     return `<div class="diff-row ${cls}">${gutter}<span class="diff-code">${e || ' '}</span></div>`;
   }).join('');
+  // Width fallback for the skipped rows (see maxTextWidth): gutter (two 4ch
+  // line numbers + 10px padding + 10px margin + 1px border) plus the widest
+  // line, plus the output's 12px right padding.
+  const gutterW = maxTextWidth(['00000000'], out.querySelector('.diff-no')) + 21;
+  out.style.setProperty('--diff-row-w',
+    `${Math.ceil(maxTextWidth(lines, out.querySelector('.diff-code')) + gutterW) + 14}px`);
   out.scrollTop = outTop;
   out.scrollLeft = outLeft;
 }
@@ -280,6 +286,26 @@ function renderFileTree(container, node, repoPath, prefix, depth) {
 
 // ---------- repo tree ----------
 
+// Widest text width of a list of strings, measured with canvas measureText in
+// the font of probeEl. The rebuilds below use it to size the width fallback of
+// the content-visibility row estimates (see styles.css): offscreen rows are
+// skipped right after a rebuild, so without a real-width fallback the widest
+// row drops out of scrollWidth and the restored horizontal scroll clamps to 0.
+const textMeasureCtx = document.createElement('canvas').getContext('2d');
+function maxTextWidth(texts, probeEl) {
+  if (probeEl) {
+    const cs = getComputedStyle(probeEl);
+    textMeasureCtx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  }
+  let w = 0;
+  for (const t of texts) {
+    if (!t) continue;
+    const tw = textMeasureCtx.measureText(String(t).replace(/\t/g, '    ')).width;
+    if (tw > w) w = tw;
+  }
+  return w;
+}
+
 // Rebuilding a list with innerHTML='' resets its scroll position, which made
 // the scrollbars jump on every 5-second auto-refresh. Save and restore around
 // the rebuild.
@@ -296,6 +322,16 @@ function renderTree() {
     const container = $('tree');
     container.innerHTML = '';
     renderTreeNodes(container, state.tree, 0);
+    // Width fallback for the skipped rows (see maxTextWidth): indent plus the
+    // widest name, plus ~90px for caret, icon, badge and padding.
+    const nameProbe = container.querySelector('.repo-name');
+    let widest = 0;
+    for (const r of container.querySelectorAll('.tree-row')) {
+      const nameEl = r.querySelector('.repo-name') || r.querySelector('.tree-icon + span');
+      const indent = parseFloat(r.style.paddingLeft) || 0;
+      widest = Math.max(widest, indent + maxTextWidth([nameEl ? nameEl.textContent : ''], nameProbe) + 90);
+    }
+    container.style.setProperty('--tree-row-w', `${Math.ceil(widest)}px`);
   });
 }
 
@@ -700,6 +736,11 @@ async function refreshStatus() {
   if (state.selection.size && !state.selectedCommit && !state.selectedFile) await showChangesDiff();
   // during a merge a commit completes the merge even with an empty index
   $('btn-commit').disabled = !s.staged.length && !s.merging;
+  // Width fallback for the skipped rows (see maxTextWidth): status letter,
+  // gap, padding, and room for the resolve button on conflict rows.
+  const conflicts = flat.some((i) => i.kind === 'conflicts');
+  list.style.setProperty('--change-row-w',
+    `${Math.ceil(maxTextWidth(flat.map((i) => i.file), list.querySelector('.path')) + 14 + 8 + 24 + (conflicts ? 110 : 0)) + 8}px`);
   list.scrollTop = listTop;
   list.scrollLeft = listLeft;
 }
