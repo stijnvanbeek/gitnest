@@ -132,7 +132,12 @@ function tokenRe(lang) {
       + '|("(?:\\\\.|[^"\\\\])*"?|\'(?:\\\\.|[^\'\\\\])*\'?)' // string / char literal
       + `|${preproc}` // preprocessor
       + `|\\b(${spec.keywords.join('|')})\\b` // keyword
-      + '|\\b(0[xX][0-9a-fA-F\']+|\\d[\\d\']*(?:\\.\\d+)?[fFuUlL]*)\\b', // number
+      + '|\\b(0[xX][0-9a-fA-F\']+|\\d[\\d\']*(?:\\.\\d+)?[fFuUlL]*)\\b' // number
+      // function call: an identifier directly followed by "(" (keywords are
+      // matched first, so "if (" stays a keyword)
+      + '|([A-Za-z_]\\w*)(?=\\s*\\()'
+      + '|\\b([A-Z][A-Z0-9_]{2,})\\b' // SCREAMING_CASE constant / macro
+      + '|\\b([A-Z]\\w*|\\w+_t)\\b', // Capitalized type or *_t typedef
       'g');
   }
   return TOKEN_RES[lang];
@@ -146,7 +151,8 @@ function highlightCode(lang, text) {
   let m;
   while ((m = re.exec(text))) {
     out += esc(text.slice(last, m.index));
-    const cls = m[1] ? 'tok-com' : m[2] ? 'tok-str' : m[3] ? 'tok-pre' : m[4] ? 'tok-kw' : 'tok-num';
+    const cls = m[1] ? 'tok-com' : m[2] ? 'tok-str' : m[3] ? 'tok-pre' : m[4] ? 'tok-kw'
+      : m[5] ? 'tok-num' : m[6] ? 'tok-fn' : m[7] ? 'tok-const' : 'tok-type';
     out += `<span class="${cls}">${esc(m[0])}</span>`;
     last = m.index + m[0].length;
     if (re.lastIndex === m.index) re.lastIndex++;

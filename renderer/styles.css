@@ -485,12 +485,15 @@ section:focus { outline: none; }
   font-family: ui-monospace, Menlo, monospace;
   user-select: none;
 }
-/* syntax highlighting (C/C++ sources) */
+/* syntax highlighting (C/C++, ChaiScript, GLSL) */
 #diff-output .tok-com { color: #6a737d; font-style: italic; }
 #diff-output .tok-str { color: #e2a35d; }
 #diff-output .tok-pre { color: #c586c0; }
 #diff-output .tok-kw  { color: #6cb2ff; }
 #diff-output .tok-num { color: #56c8d8; }
+#diff-output .tok-fn  { color: #dcdcaa; }
+#diff-output .tok-type { color: #4ec9b0; }
+#diff-output .tok-const { color: #d7ba7d; }
 #diff-output .diff-row.dl-hunk .diff-code { color: var(--accent); }
 #diff-output .diff-row.dl-file .diff-code { color: var(--fg-dim); font-weight: 700; }
 
