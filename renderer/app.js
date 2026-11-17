@@ -77,6 +77,47 @@ function setResult(text, isError) {
 
 // ---------- diff pane ----------
 
+// Minimal C/C++ syntax highlighter for the diff pane: comments, strings,
+// preprocessor lines, keywords and numbers. Tokenizes the raw text and escapes
+// each piece, so no HTML can sneak in through the diff content.
+const CPP_KEYWORDS = [
+  'alignas', 'alignof', 'and', 'asm', 'auto', 'bool', 'break', 'case', 'catch',
+  'char', 'class', 'const', 'constexpr', 'const_cast', 'continue', 'decltype',
+  'default', 'delete', 'do', 'double', 'dynamic_cast', 'else', 'enum',
+  'explicit', 'export', 'extern', 'false', 'float', 'for', 'friend', 'goto',
+  'if', 'inline', 'int', 'long', 'mutable', 'namespace', 'new', 'noexcept',
+  'not', 'nullptr', 'operator', 'or', 'override', 'private', 'protected',
+  'public', 'register', 'return', 'short', 'signed', 'sizeof', 'static',
+  'static_assert', 'static_cast', 'struct', 'switch', 'template', 'this',
+  'throw', 'true', 'try', 'typedef', 'typeid', 'typename', 'union', 'unsigned',
+  'using', 'virtual', 'void', 'volatile', 'while',
+];
+const CPP_TOKEN_RE = new RegExp(
+  '(\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/)' // comment
+  + '|("(?:\\\\.|[^"\\\\])*"?|\'(?:\\\\.|[^\'\\\\])*\'?)' // string / char literal
+  + '|(^\\s*#\\s*\\w+)' // preprocessor
+  + `|\\b(${CPP_KEYWORDS.join('|')})\\b` // keyword
+  + '|\\b(0[xX][0-9a-fA-F\']+|\\d[\\d\']*(?:\\.\\d+)?[fFuUlL]*)\\b', // number
+  'g');
+
+function highlightCpp(text) {
+  let out = '';
+  let last = 0;
+  CPP_TOKEN_RE.lastIndex = 0;
+  let m;
+  while ((m = CPP_TOKEN_RE.exec(text))) {
+    out += esc(text.slice(last, m.index));
+    const cls = m[1] ? 'tok-com' : m[2] ? 'tok-str' : m[3] ? 'tok-pre' : m[4] ? 'tok-kw' : 'tok-num';
+    out += `<span class="${cls}">${esc(m[0])}</span>`;
+    last = m.index + m[0].length;
+    if (CPP_TOKEN_RE.lastIndex === m.index) CPP_TOKEN_RE.lastIndex++;
+  }
+  return out + esc(text.slice(last));
+}
+
+// Highlight code lines only for C/C++ sources; everything else stays plain.
+const CPP_EXT_RE = /\.(?:c|cc|cpp|cxx|h|hh|hpp|hxx|inl|ipp|tpp)$/i;
+
 function setDiff(header, text) {
   $('diff-header').textContent = header;
   const out = $('diff-output');
@@ -85,31 +126,50 @@ function setDiff(header, text) {
   const lines = String(text).split('\n');
   let oldNo = 0;
   let newNo = 0;
+  let lang = null; // set from the +++ b/<path> header of each file in the diff
   out.innerHTML = lines.map((l) => {
-    const e = esc(l);
     let cls = '';
+    let sign = '';
+    let code = l;
     let oldTxt = '';
     let newTxt = '';
     if (l.startsWith('@@')) {
       const m = l.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
       if (m) { oldNo = parseInt(m[1], 10); newNo = parseInt(m[2], 10); }
       cls = 'dl-hunk';
-    } else if (l.startsWith('diff --git') || l.startsWith('+++') || l.startsWith('---') || l.startsWith('index ')) {
+      code = '';
+    } else if (l.startsWith('diff --git') || l.startsWith('---') || l.startsWith('index ')) {
       cls = 'dl-file';
+      code = '';
+    } else if (l.startsWith('+++')) {
+      cls = 'dl-file';
+      // "+++ b/src/foo.cpp" names the file: its extension picks the highlighter
+      const p = l.slice(4);
+      lang = CPP_EXT_RE.test(p) ? 'cpp' : null;
+      code = '';
     } else if (l.startsWith('\\')) {
       cls = 'dl-file';
+      code = '';
     } else if (l.startsWith('+')) {
       cls = 'dl-add';
+      sign = '+';
+      code = l.slice(1);
       newTxt = newNo++;
     } else if (l.startsWith('-')) {
       cls = 'dl-del';
+      sign = '-';
+      code = l.slice(1);
       oldTxt = oldNo++;
-    } else if (l) {
+    } else {
       oldTxt = oldNo++;
       newTxt = newNo++;
     }
     const gutter = `<span class="diff-gutter"><span class="diff-no">${oldTxt}</span><span class="diff-no">${newTxt}</span></span>`;
-    return `<div class="diff-row ${cls}">${gutter}<span class="diff-code">${e || ' '}</span></div>`;
+    const body = cls === 'dl-hunk' || cls === 'dl-file'
+      ? esc(l)
+      : (lang === 'cpp' ? highlightCpp(code) : esc(code));
+    const signSpan = sign ? `<span class="diff-sign">${sign}</span>` : '';
+    return `<div class="diff-row ${cls}">${gutter}${signSpan}<span class="diff-code">${body || ' '}</span></div>`;
   }).join('');
   // Width fallback for the skipped rows (see maxTextWidth): gutter (two 4ch
   // line numbers + 10px padding + 10px margin + 1px border) plus the widest

@@ -475,8 +475,19 @@ section:focus { outline: none; }
   text-align: right;
 }
 #diff-output .diff-no { display: inline-block; width: 4ch; }
-#diff-output .diff-row.dl-add .diff-code { color: var(--green); }
-#diff-output .diff-row.dl-del .diff-code { color: var(--red); }
+#diff-output .diff-row.dl-add .diff-sign { color: var(--green); font-weight: 600; }
+#diff-output .diff-row.dl-del .diff-sign { color: var(--red); font-weight: 600; }
+#diff-output .diff-sign {
+  flex-shrink: 0;
+  font-family: ui-monospace, Menlo, monospace;
+  user-select: none;
+}
+/* syntax highlighting (C/C++ sources) */
+#diff-output .tok-com { color: #6a737d; font-style: italic; }
+#diff-output .tok-str { color: #e2a35d; }
+#diff-output .tok-pre { color: #c586c0; }
+#diff-output .tok-kw  { color: #6cb2ff; }
+#diff-output .tok-num { color: #56c8d8; }
 #diff-output .diff-row.dl-hunk .diff-code { color: var(--accent); }
 #diff-output .diff-row.dl-file .diff-code { color: var(--fg-dim); font-weight: 700; }
 
