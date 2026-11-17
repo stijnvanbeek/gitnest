@@ -477,6 +477,9 @@ section:focus { outline: none; }
 #diff-output .diff-no { display: inline-block; width: 4ch; }
 #diff-output .diff-row.dl-add .diff-sign { color: var(--green); font-weight: 600; }
 #diff-output .diff-row.dl-del .diff-sign { color: var(--red); font-weight: 600; }
+/* subtle tint over the whole line so added/removed blocks read at a glance */
+#diff-output .diff-row.dl-add { background: rgba(76, 175, 109, 0.08); }
+#diff-output .diff-row.dl-del { background: rgba(224, 93, 93, 0.08); }
 #diff-output .diff-sign {
   flex-shrink: 0;
   font-family: ui-monospace, Menlo, monospace;

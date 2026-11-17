@@ -77,46 +77,90 @@ function setResult(text, isError) {
 
 // ---------- diff pane ----------
 
-// Minimal C/C++ syntax highlighter for the diff pane: comments, strings,
+// Minimal syntax highlighters for the diff pane: comments, strings,
 // preprocessor lines, keywords and numbers. Tokenizes the raw text and escapes
 // each piece, so no HTML can sneak in through the diff content.
-const CPP_KEYWORDS = [
-  'alignas', 'alignof', 'and', 'asm', 'auto', 'bool', 'break', 'case', 'catch',
-  'char', 'class', 'const', 'constexpr', 'const_cast', 'continue', 'decltype',
-  'default', 'delete', 'do', 'double', 'dynamic_cast', 'else', 'enum',
-  'explicit', 'export', 'extern', 'false', 'float', 'for', 'friend', 'goto',
-  'if', 'inline', 'int', 'long', 'mutable', 'namespace', 'new', 'noexcept',
-  'not', 'nullptr', 'operator', 'or', 'override', 'private', 'protected',
-  'public', 'register', 'return', 'short', 'signed', 'sizeof', 'static',
-  'static_assert', 'static_cast', 'struct', 'switch', 'template', 'this',
-  'throw', 'true', 'try', 'typedef', 'typeid', 'typename', 'union', 'unsigned',
-  'using', 'virtual', 'void', 'volatile', 'while',
-];
-const CPP_TOKEN_RE = new RegExp(
-  '(\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/)' // comment
-  + '|("(?:\\\\.|[^"\\\\])*"?|\'(?:\\\\.|[^\'\\\\])*\'?)' // string / char literal
-  + '|(^\\s*#\\s*\\w+)' // preprocessor
-  + `|\\b(${CPP_KEYWORDS.join('|')})\\b` // keyword
-  + '|\\b(0[xX][0-9a-fA-F\']+|\\d[\\d\']*(?:\\.\\d+)?[fFuUlL]*)\\b', // number
-  'g');
+const HIGHLIGHT_LANGS = {
+  cpp: {
+    preproc: true,
+    keywords: [
+      'alignas', 'alignof', 'and', 'asm', 'auto', 'bool', 'break', 'case', 'catch',
+      'char', 'class', 'const', 'constexpr', 'const_cast', 'continue', 'decltype',
+      'default', 'delete', 'do', 'double', 'dynamic_cast', 'else', 'enum',
+      'explicit', 'export', 'extern', 'false', 'float', 'for', 'friend', 'goto',
+      'if', 'inline', 'int', 'long', 'mutable', 'namespace', 'new', 'noexcept',
+      'not', 'nullptr', 'operator', 'or', 'override', 'private', 'protected',
+      'public', 'register', 'return', 'short', 'signed', 'sizeof', 'static',
+      'static_assert', 'static_cast', 'struct', 'switch', 'template', 'this',
+      'throw', 'true', 'try', 'typedef', 'typeid', 'typename', 'union', 'unsigned',
+      'using', 'virtual', 'void', 'volatile', 'while',
+    ],
+  },
+  chai: {
+    preproc: false,
+    keywords: [
+      'fun', 'def', 'var', 'auto', 'const', 'global', 'attr', 'if', 'else',
+      'for', 'while', 'do', 'switch', 'case', 'default', 'break', 'continue',
+      'try', 'catch', 'return', 'this', 'true', 'false', 'and', 'or', 'not',
+    ],
+  },
+  glsl: {
+    preproc: true,
+    keywords: [
+      'precision', 'highp', 'mediump', 'lowp', 'uniform', 'attribute', 'varying',
+      'buffer', 'shared', 'layout', 'centroid', 'flat', 'smooth', 'noperspective',
+      'patch', 'sample', 'subroutine', 'in', 'out', 'inout', 'void', 'bool',
+      'int', 'uint', 'float', 'double', 'vec2', 'vec3', 'vec4', 'ivec2', 'ivec3',
+      'ivec4', 'uvec2', 'uvec3', 'uvec4', 'bvec2', 'bvec3', 'bvec4', 'dvec2',
+      'dvec3', 'dvec4', 'mat2', 'mat3', 'mat4', 'dmat2', 'dmat3', 'dmat4',
+      'sampler1D', 'sampler2D', 'sampler3D', 'samplerCube', 'sampler2DShadow',
+      'samplerCubeShadow', 'sampler2DArray', 'sampler1DShadow', 'image1D',
+      'image2D', 'image3D', 'discard', 'struct', 'true', 'false', 'if', 'else',
+      'for', 'while', 'do', 'switch', 'case', 'default', 'break', 'continue',
+      'return', 'const',
+    ],
+  },
+};
+const TOKEN_RES = {}; // lang -> token regex, built on first use
+function tokenRe(lang) {
+  if (!TOKEN_RES[lang]) {
+    const spec = HIGHLIGHT_LANGS[lang];
+    // a capture group that can never match keeps the group indices stable
+    const preproc = spec.preproc ? '(^\\s*#\\s*\\w+)' : '((?!))';
+    TOKEN_RES[lang] = new RegExp(
+      '(\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/)' // comment
+      + '|("(?:\\\\.|[^"\\\\])*"?|\'(?:\\\\.|[^\'\\\\])*\'?)' // string / char literal
+      + `|${preproc}` // preprocessor
+      + `|\\b(${spec.keywords.join('|')})\\b` // keyword
+      + '|\\b(0[xX][0-9a-fA-F\']+|\\d[\\d\']*(?:\\.\\d+)?[fFuUlL]*)\\b', // number
+      'g');
+  }
+  return TOKEN_RES[lang];
+}
 
-function highlightCpp(text) {
+function highlightCode(lang, text) {
+  const re = tokenRe(lang);
   let out = '';
   let last = 0;
-  CPP_TOKEN_RE.lastIndex = 0;
+  re.lastIndex = 0;
   let m;
-  while ((m = CPP_TOKEN_RE.exec(text))) {
+  while ((m = re.exec(text))) {
     out += esc(text.slice(last, m.index));
     const cls = m[1] ? 'tok-com' : m[2] ? 'tok-str' : m[3] ? 'tok-pre' : m[4] ? 'tok-kw' : 'tok-num';
     out += `<span class="${cls}">${esc(m[0])}</span>`;
     last = m.index + m[0].length;
-    if (CPP_TOKEN_RE.lastIndex === m.index) CPP_TOKEN_RE.lastIndex++;
+    if (re.lastIndex === m.index) re.lastIndex++;
   }
   return out + esc(text.slice(last));
 }
 
-// Highlight code lines only for C/C++ sources; everything else stays plain.
-const CPP_EXT_RE = /\.(?:c|cc|cpp|cxx|h|hh|hpp|hxx|inl|ipp|tpp)$/i;
+// Which highlighter a diffed file gets, by extension; null stays plain.
+function langForPath(p) {
+  if (/\.(?:c|cc|cpp|cxx|h|hh|hpp|hxx|inl|ipp|tpp)$/i.test(p)) return 'cpp';
+  if (/\.chai$/i.test(p)) return 'chai';
+  if (/\.(?:vert|frag|geom|comp|tesc|tese|glsl|vs|fs)$/i.test(p)) return 'glsl';
+  return null;
+}
 
 function setDiff(header, text) {
   $('diff-header').textContent = header;
@@ -145,7 +189,7 @@ function setDiff(header, text) {
       cls = 'dl-file';
       // "+++ b/src/foo.cpp" names the file: its extension picks the highlighter
       const p = l.slice(4);
-      lang = CPP_EXT_RE.test(p) ? 'cpp' : null;
+      lang = langForPath(p);
       code = '';
     } else if (l.startsWith('\\')) {
       cls = 'dl-file';
@@ -167,7 +211,7 @@ function setDiff(header, text) {
     const gutter = `<span class="diff-gutter"><span class="diff-no">${oldTxt}</span><span class="diff-no">${newTxt}</span></span>`;
     const body = cls === 'dl-hunk' || cls === 'dl-file'
       ? esc(l)
-      : (lang === 'cpp' ? highlightCpp(code) : esc(code));
+      : (lang ? highlightCode(lang, code) : esc(code));
     const signSpan = sign ? `<span class="diff-sign">${sign}</span>` : '';
     return `<div class="diff-row ${cls}">${gutter}${signSpan}<span class="diff-code">${body || ' '}</span></div>`;
   }).join('');
