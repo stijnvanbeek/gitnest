@@ -478,17 +478,12 @@ section:focus { outline: none; }
 #diff-output .diff-row.dl-add .diff-sign { color: var(--green); font-weight: 600; }
 #diff-output .diff-row.dl-del .diff-sign { color: var(--red); font-weight: 600; }
 /* subtle tint over the whole line so added/removed blocks read at a glance.
-   The 1px box-shadow overdraw hides the antialiasing seam between adjacent
-   tinted rows: rows get fractional heights at non-100% zooms and the boundary
-   between two boxes then blends with the panel background as a hairline. */
-#diff-output .diff-row.dl-add {
-  background: rgba(76, 175, 109, 0.08);
-  box-shadow: 0 1px 0 rgba(76, 175, 109, 0.08), 0 -1px 0 rgba(76, 175, 109, 0.08);
-}
-#diff-output .diff-row.dl-del {
-  background: rgba(224, 93, 93, 0.08);
-  box-shadow: 0 1px 0 rgba(224, 93, 93, 0.08), 0 -1px 0 rgba(224, 93, 93, 0.08);
-}
+   The colors are the 8% green/red tints pre-blended into the pane background
+   (--bg-alt #262a33) and applied opaque: adjacent translucent boxes leave an
+   antialiasing hairline at their boundary when rows land on fractional pixel
+   positions (any non-100% zoom), while equal opaque colors blend seamlessly. */
+#diff-output .diff-row.dl-add { background: rgb(41, 53, 56); }
+#diff-output .diff-row.dl-del { background: rgb(53, 46, 54); }
 #diff-output .diff-sign {
   flex-shrink: 0;
   font-family: ui-monospace, Menlo, monospace;
