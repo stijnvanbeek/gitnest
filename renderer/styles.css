@@ -492,9 +492,10 @@ section:focus { outline: none; }
   font-family: ui-monospace, Menlo, monospace;
   user-select: none;
 }
-/* syntax highlighting (C/C++, ChaiScript, GLSL) */
+/* syntax highlighting (C/C++, ChaiScript, GLSL, JSON, CMake) */
 #diff-output .tok-com { color: #6a737d; font-style: italic; }
 #diff-output .tok-str { color: #e2a35d; }
+#diff-output .tok-key { color: #9cdcfe; }
 #diff-output .tok-pre { color: #c586c0; }
 #diff-output .tok-kw  { color: #6cb2ff; }
 #diff-output .tok-num { color: #56c8d8; }

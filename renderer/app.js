@@ -120,27 +120,58 @@ const HIGHLIGHT_LANGS = {
       'return', 'const',
     ],
   },
+  json: {
+    comment: null, // JSON has no comments
+    key: true, // "name": strings followed by ':' are object keys
+    preproc: false,
+    keywords: ['true', 'false', 'null'],
+  },
+  cmake: {
+    comment: '#[^\\n]*', // CMake comments run from # to end of line
+    preproc: false,
+    keywords: [
+      'if', 'elseif', 'else', 'endif', 'foreach', 'endforeach', 'while',
+      'endwhile', 'function', 'endfunction', 'macro', 'endmacro', 'break',
+      'continue', 'return', 'set', 'unset', 'option', 'include', 'project',
+    ],
+  },
 };
-const TOKEN_RES = {}; // lang -> token regex, built on first use
+const TOKEN_RES = {}; // lang -> { re, classes }, built on first use
 function tokenRe(lang) {
   if (!TOKEN_RES[lang]) {
     const spec = HIGHLIGHT_LANGS[lang];
     // a capture group that can never match keeps the group indices stable
     const preproc = spec.preproc ? '(^\\s*#\\s*\\w+)' : '((?!))';
-    TOKEN_RES[lang] = new RegExp(
-      // comment; the last alternative catches a /* that does not close on
-      // this line (multi-line block comment opening)
-      '(\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/|\\/\\*[^\\n]*)'
-      + '|("(?:\\\\.|[^"\\\\])*"?|\'(?:\\\\.|[^\'\\\\])*\'?)' // string / char literal
-      + `|${preproc}` // preprocessor
-      + `|\\b(${spec.keywords.join('|')})\\b` // keyword
-      + '|\\b(0[xX][0-9a-fA-F\']+|\\d[\\d\']*(?:\\.\\d+)?[fFuUlL]*)\\b' // number
-      // function call: an identifier directly followed by "(" (keywords are
-      // matched first, so "if (" stays a keyword)
-      + '|([A-Za-z_]\\w*)(?=\\s*\\()'
-      + '|\\b([A-Z][A-Z0-9_]{2,})\\b' // SCREAMING_CASE constant / macro
-      + '|\\b([A-Z]\\w*|\\w+_t)\\b', // Capitalized type or *_t typedef
-      'g');
+    // comment style per language; the default is C-style // and /* */
+    const comment = spec.comment === undefined
+      ? '(\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/|\\/\\*[^\\n]*)' : spec.comment;
+    const classes = []; // class per capture group, in group order
+    let src = '';
+    if (spec.key) { // JSON object key: a string directly followed by ':'
+      src += '("(?:\\\\.|[^"\\\\])*")(?=\\s*:)';
+      classes.push('tok-key');
+    }
+    if (comment) {
+      src += `${src ? '|' : ''}(${comment})`;
+      classes.push('tok-com');
+    }
+    src += '|("(?:\\\\.|[^"\\\\])*"?|\'(?:\\\\.|[^\'\\\\])*\'?)'; // string / char literal
+    classes.push('tok-str');
+    src += `|${preproc}`;
+    classes.push('tok-pre');
+    src += `|\\b(${spec.keywords.join('|')})\\b`; // keyword
+    classes.push('tok-kw');
+    src += '|\\b(0[xX][0-9a-fA-F\']+|\\d[\\d\']*(?:\\.\\d+)?[fFuUlL]*)\\b'; // number
+    classes.push('tok-num');
+    // function call: an identifier directly followed by "(" (keywords are
+    // matched first, so "if (" stays a keyword)
+    src += '|([A-Za-z_]\\w*)(?=\\s*\\()';
+    classes.push('tok-fn');
+    src += '|\\b([A-Z][A-Z0-9_]{2,})\\b'; // SCREAMING_CASE constant / macro
+    classes.push('tok-const');
+    src += '|\\b([A-Z]\\w*|\\w+_t)\\b'; // Capitalized type or *_t typedef
+    classes.push('tok-type');
+    TOKEN_RES[lang] = { re: new RegExp(src, 'g'), classes };
   }
   return TOKEN_RES[lang];
 }
@@ -149,7 +180,7 @@ function tokenRe(lang) {
 // lines, so a multi-line /* ... */ comment is colored on every line it spans.
 function highlightCode(lang, text, state) {
   if (!lang) return esc(text);
-  const re = tokenRe(lang);
+  const { re, classes } = tokenRe(lang);
   let out = '';
   let rest = text;
   if (state && state.inBlock) {
@@ -166,8 +197,10 @@ function highlightCode(lang, text, state) {
   let m;
   while ((m = re.exec(rest))) {
     out += esc(rest.slice(last, m.index));
-    const cls = m[1] ? 'tok-com' : m[2] ? 'tok-str' : m[3] ? 'tok-pre' : m[4] ? 'tok-kw'
-      : m[5] ? 'tok-num' : m[6] ? 'tok-fn' : m[7] ? 'tok-const' : 'tok-type';
+    // the first defined capture group decides the class
+    let gi = 1;
+    while (gi < m.length && m[gi] === undefined) gi++;
+    const cls = classes[gi - 1] || 'tok-type';
     if (state && cls === 'tok-com' && m[0].startsWith('/*') && !m[0].includes('*/')) {
       // block comment that does not close on this line: the rest of the line
       // is comment and the following lines stay inside the comment
@@ -185,6 +218,8 @@ function langForPath(p) {
   if (/\.(?:c|cc|cpp|cxx|h|hh|hpp|hxx|inl|ipp|tpp)$/i.test(p)) return 'cpp';
   if (/\.chai$/i.test(p)) return 'chai';
   if (/\.(?:vert|frag|geom|comp|tesc|tese|glsl|vs|fs)$/i.test(p)) return 'glsl';
+  if (/\.json$/i.test(p)) return 'json';
+  if (/(?:^|\/)CMakeLists\.txt$/i.test(p) || /\.cmake$/i.test(p)) return 'cmake';
   return null;
 }
 
