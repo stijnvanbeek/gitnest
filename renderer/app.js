@@ -218,13 +218,16 @@ function setDiff(header, text) {
     const body = cls === 'dl-hunk' || cls === 'dl-file'
       ? esc(l)
       : (lang ? highlightCode(lang, code) : esc(code));
-    const signSpan = sign ? `<span class="diff-sign">${sign}</span>` : '';
+    // every row gets the sign cell (empty on unchanged lines) so the code of
+    // added/removed lines aligns with the code of context lines
+    const signSpan = `<span class="diff-sign">${sign}</span>`;
     return `<div class="diff-row ${cls}">${gutter}${signSpan}<span class="diff-code">${body || ' '}</span></div>`;
   }).join('');
   // Width fallback for the skipped rows (see maxTextWidth): gutter (two 4ch
-  // line numbers + 10px padding + 10px margin + 1px border) plus the widest
-  // line, plus the output's 12px right padding.
-  const gutterW = maxTextWidth(['00000000'], out.querySelector('.diff-no')) + 21;
+  // line numbers + 10px padding + 10px margin + 1px border) plus the sign
+  // cell plus the widest line, plus the output's 12px right padding.
+  const gutterW = maxTextWidth(['00000000'], out.querySelector('.diff-no')) + 21
+    + maxTextWidth(['+'], out.querySelector('.diff-sign'));
   out.style.setProperty('--diff-row-w',
     `${Math.ceil(maxTextWidth(lines, out.querySelector('.diff-code')) + gutterW) + 14}px`);
   out.scrollTop = outTop;

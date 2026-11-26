@@ -486,6 +486,9 @@ section:focus { outline: none; }
 #diff-output .diff-row.dl-del { background: rgb(53, 46, 54); }
 #diff-output .diff-sign {
   flex-shrink: 0;
+  /* exactly one character cell on every row (empty on unchanged lines) so
+     the code of all rows starts at the same x */
+  width: 1ch;
   font-family: ui-monospace, Menlo, monospace;
   user-select: none;
 }
