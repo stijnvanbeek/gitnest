@@ -943,8 +943,11 @@ async function refreshLog() {
   }
   // The log is uncapped and can be thousands of rows: when nothing changed,
   // skip the rebuild so the 5-second refresh stays cheap (large logs only —
-  // small ones keep re-rendering so their relative dates stay fresh).
-  const sig = state.log.map((c) => c.hash).join(',');
+  // small ones keep re-rendering so their relative dates stay fresh). The
+  // unpushed set is part of the signature: a push does not change the commits
+  // but must still clear the orange arrows.
+  const sig = state.log.map((c) => c.hash).join(',')
+    + '|' + [...state.unpushed].sort().join(',');
   if (sig === state.logSig && state.log.length > 300) return;
   renderLog();
 }
@@ -953,7 +956,8 @@ let renderLogGeneration = 0; // invalidates in-flight chunked renders
 
 function renderLog() {
   const gen = ++renderLogGeneration;
-  state.logSig = state.log.map((c) => c.hash).join(',');
+  state.logSig = state.log.map((c) => c.hash).join(',')
+    + '|' + [...state.unpushed].sort().join(',');
   const list = $('log-list');
   const listTop = list.scrollTop;
   const listLeft = list.scrollLeft;
