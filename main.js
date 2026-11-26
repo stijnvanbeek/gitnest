@@ -212,11 +212,20 @@ function registerHandlers() {
   // otherwise revert. Every mode also offers "Copy cherry pick" (remembers
   // the commit and puts its sha on the clipboard) and "Paste cherry pick",
   // enabled only when the copied commit exists in this repo (same repo or a
-  // fork/clone sharing its history). Resolves to 'revert', 'cherry', 'copy',
-  // 'paste' or null when dismissed by clicking elsewhere.
+  // fork/clone sharing its history). Normal mode adds "Undo commit", enabled
+  // only for the last commit while it is unpushed. Resolves to 'revert',
+  // 'undo', 'cherry', 'copy', 'paste' or null when dismissed by clicking
+  // elsewhere.
   ipcMain.handle('menu:history', async (e, repo, hash, subject, behind) => {
     const pasteOk = cherryClipboard
       ? await git.canCherryPick(repo, cherryClipboard.hash) : false;
+    // Undo commit: only the last commit, only while unpushed
+    let undoOk = false;
+    if (!behind) {
+      const head = await git.run(repo, ['rev-parse', '--short', 'HEAD']);
+      undoOk = head.ok && head.stdout.trim() === hash
+        && (await git.unpushedHashes(repo)).includes(hash);
+    }
     let picked = null;
     const template = [];
     if (behind) {
@@ -228,6 +237,11 @@ function registerHandlers() {
       template.push({
         label: `Revert commit ${hash} ("${(subject || '').slice(0, 60)}")`,
         click: () => { picked = 'revert'; },
+      });
+      template.push({
+        label: `Undo commit ${hash} ("${(subject || '').slice(0, 60)}")`,
+        enabled: undoOk,
+        click: () => { picked = 'undo'; },
       });
     }
     template.push(

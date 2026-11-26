@@ -610,14 +610,6 @@ function applySelectionHighlight() {
 function updateSelToolbar() {
   const n = state.selection.size;
   $('selection-info').textContent = n ? `${n} staged` : '';
-  updateUndoButton();
-}
-
-// Undo Commit is only possible while the last commit of the current branch
-// (the repo-wide history's first entry) is still unpushed.
-function updateUndoButton() {
-  const head = !state.behindBranch && !state.selectedFile && state.log.length ? state.log[0] : null;
-  $('btn-undo-commit').disabled = !head || !state.unpushed.has(head.hash);
 }
 
 // The selection IS the staged set: selecting a file stages it, deselecting
@@ -872,7 +864,6 @@ async function refreshLog() {
   const paths = state.selectedFile ? [state.selectedFile] : [];
   const [res, unp] = await Promise.all([api.log(state.selected, paths), api.unpushed(state.selected)]);
   state.unpushed = new Set(unp || []);
-  updateUndoButton();
   state.log = (res && res.entries) || [];
   state.logTruncated = !!(res && res.truncated);
   state.logTotal = res ? res.total : null;
@@ -988,6 +979,21 @@ function renderLog() {
           await refreshCounts();
         } else {
           setResult(`Revert failed:\n${r.error || r.output || ''}`, true);
+        }
+        return;
+      }
+      if (act === 'undo') {
+        // mixed reset: HEAD moves back one commit, the commit's changes stay
+        // in the working tree (unstaged). The menu only offers this for the
+        // last commit while unpushed; asked first, it's final.
+        if (!confirm(`Undo commit ${c.hash}?\n\nHEAD moves back one commit; the commit's changes stay in the working tree.`)) return;
+        const r = await api.undoLastCommit(state.selected, c.hash);
+        if (r.ok) {
+          setResult(`Undid commit ${c.hash}; its changes are back in the working tree.`, false);
+          await Promise.all([refreshStatus(), refreshLog(), refreshBranches()]);
+          await refreshCounts();
+        } else {
+          setResult(`Undo commit failed:\n${r.error || r.output || ''}`, true);
         }
       }
     });
@@ -1414,26 +1420,6 @@ $('btn-revert').addEventListener('click', async () => {
     await fullRefresh();
   } else {
     setResult(`Revert failed:\n${r.error}`, true);
-  }
-});
-
-// Undo Commit drops the last commit: HEAD moves back one commit and its
-// changes are discarded. Only offered while that commit is unpushed (the
-// button is disabled otherwise), and asked first, it's final.
-$('btn-undo-commit').addEventListener('click', async () => {
-  if (!state.selected) return;
-  const c = state.log[0];
-  if (!c || !state.unpushed.has(c.hash)) return;
-  if (!confirm(`Undo the last commit?\n\n${c.hash} ${c.subject}\n\nHEAD moves back one commit and the commit's changes are discarded. This cannot be undone.`)) return;
-  const r = await api.undoLastCommit(state.selected);
-  if (r.ok) {
-    setResult(`Undid commit ${c.hash}.`, false);
-    state.selection = new Set();
-    state.anchor = null;
-    state.changeCursor = null;
-    await fullRefresh();
-  } else {
-    setResult(`Undo commit failed:\n${r.error}`, true);
   }
 });
 
