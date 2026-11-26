@@ -128,7 +128,9 @@ function tokenRe(lang) {
     // a capture group that can never match keeps the group indices stable
     const preproc = spec.preproc ? '(^\\s*#\\s*\\w+)' : '((?!))';
     TOKEN_RES[lang] = new RegExp(
-      '(\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/)' // comment
+      // comment; the last alternative catches a /* that does not close on
+      // this line (multi-line block comment opening)
+      '(\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/|\\/\\*[^\\n]*)'
       + '|("(?:\\\\.|[^"\\\\])*"?|\'(?:\\\\.|[^\'\\\\])*\'?)' // string / char literal
       + `|${preproc}` // preprocessor
       + `|\\b(${spec.keywords.join('|')})\\b` // keyword
@@ -143,21 +145,39 @@ function tokenRe(lang) {
   return TOKEN_RES[lang];
 }
 
-function highlightCode(lang, text) {
+// Highlights one diff line. state carries the block-comment state across
+// lines, so a multi-line /* ... */ comment is colored on every line it spans.
+function highlightCode(lang, text, state) {
+  if (!lang) return esc(text);
   const re = tokenRe(lang);
   let out = '';
-  let last = 0;
+  let rest = text;
+  if (state && state.inBlock) {
+    // still inside a block comment from a previous line: everything up to the
+    // closing */ is comment, the rest is tokenized normally
+    const end = rest.indexOf('*/');
+    if (end === -1) return `<span class="tok-com">${esc(rest)}</span>`;
+    out += `<span class="tok-com">${esc(rest.slice(0, end + 2))}</span>`;
+    rest = rest.slice(end + 2);
+    state.inBlock = false;
+  }
   re.lastIndex = 0;
+  let last = 0;
   let m;
-  while ((m = re.exec(text))) {
-    out += esc(text.slice(last, m.index));
+  while ((m = re.exec(rest))) {
+    out += esc(rest.slice(last, m.index));
     const cls = m[1] ? 'tok-com' : m[2] ? 'tok-str' : m[3] ? 'tok-pre' : m[4] ? 'tok-kw'
       : m[5] ? 'tok-num' : m[6] ? 'tok-fn' : m[7] ? 'tok-const' : 'tok-type';
+    if (state && cls === 'tok-com' && m[0].startsWith('/*') && !m[0].includes('*/')) {
+      // block comment that does not close on this line: the rest of the line
+      // is comment and the following lines stay inside the comment
+      state.inBlock = true;
+    }
     out += `<span class="${cls}">${esc(m[0])}</span>`;
     last = m.index + m[0].length;
     if (re.lastIndex === m.index) re.lastIndex++;
   }
-  return out + esc(text.slice(last));
+  return out + esc(rest.slice(last));
 }
 
 // Which highlighter a diffed file gets, by extension; null stays plain.
@@ -174,6 +194,7 @@ function setDiff(header, text) {
   const outTop = out.scrollTop;
   const outLeft = out.scrollLeft;
   const lines = String(text).split('\n');
+  const hlState = { inBlock: false }; // block-comment state carried across lines
   let oldNo = 0;
   let newNo = 0;
   let lang = null; // set from the +++ b/<path> header of each file in the diff
@@ -191,6 +212,7 @@ function setDiff(header, text) {
     } else if (l.startsWith('diff --git') || l.startsWith('---') || l.startsWith('index ')) {
       cls = 'dl-file';
       code = '';
+      if (l.startsWith('diff --git')) hlState.inBlock = false; // comments don't span files
     } else if (l.startsWith('+++')) {
       cls = 'dl-file';
       // "+++ b/src/foo.cpp" names the file: its extension picks the highlighter
@@ -217,7 +239,7 @@ function setDiff(header, text) {
     const gutter = `<span class="diff-gutter"><span class="diff-no">${oldTxt}</span><span class="diff-no">${newTxt}</span></span>`;
     const body = cls === 'dl-hunk' || cls === 'dl-file'
       ? esc(l)
-      : (lang ? highlightCode(lang, code) : esc(code));
+      : (lang ? highlightCode(lang, code, hlState) : esc(code));
     // every row gets the sign cell (empty on unchanged lines) so the code of
     // added/removed lines aligns with the code of context lines
     const signSpan = `<span class="diff-sign">${sign}</span>`;
