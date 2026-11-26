@@ -200,6 +200,7 @@ function registerHandlers() {
   ipcMain.handle('repo:merge', (e, repo, name) => git.merge(repo, name));
   ipcMain.handle('repo:revert', (e, repo, paths) => git.revert(repo, paths));
   ipcMain.handle('repo:revertcommit', (e, repo, hash) => git.revertCommit(repo, hash));
+  ipcMain.handle('repo:undolastcommit', (e, repo) => git.undoLastCommit(repo));
   ipcMain.handle('repo:cherrypick', (e, repo, hash) => git.cherryPick(repo, hash));
   ipcMain.handle('repo:stashlist', (e, repo) => git.stashList(repo));
   ipcMain.handle('repo:stash', (e, repo, paths) => git.stash(repo, paths || []));

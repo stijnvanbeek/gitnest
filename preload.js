@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('gitnest', {
   merge: (repo, name) => ipcRenderer.invoke('repo:merge', repo, name),
   revert: (repo, paths) => ipcRenderer.invoke('repo:revert', repo, paths),
   revertCommit: (repo, hash) => ipcRenderer.invoke('repo:revertcommit', repo, hash),
+  undoLastCommit: (repo) => ipcRenderer.invoke('repo:undolastcommit', repo),
   cherryPick: (repo, hash) => ipcRenderer.invoke('repo:cherrypick', repo, hash),
   stashList: (repo) => ipcRenderer.invoke('repo:stashlist', repo),
   stash: (repo, paths) => ipcRenderer.invoke('repo:stash', repo, paths),
