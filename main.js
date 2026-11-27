@@ -181,7 +181,7 @@ function registerHandlers() {
     return cfg;
   });
 
-  ipcMain.handle('repos:clone', async (e, url, destParent) => {
+  ipcMain.handle('repos:clone', async (e, url, destParent, name, addRoot) => {
     // Toolbar clone: no destination given, clone next to the first root and
     // add the clone as a tree root. Clone-here: destParent is the selected
     // directory; the clone shows up nested inside it on the next scan.
@@ -193,14 +193,16 @@ function registerHandlers() {
       }
       dest = path.dirname(path.resolve(cfg.roots[0]));
     }
-    const r = await git.cloneRepo(url, dest);
-    if (r.ok && !destParent) {
+    const r = await git.cloneRepo(url, dest, name);
+    if (r.ok && addRoot) {
       const cfg = await readConfig();
       if (!cfg.roots.includes(r.path)) cfg.roots.push(r.path);
       await writeConfig(cfg);
     }
     return r;
   });
+
+  // (folder picking reuses the existing dialog:pickFolder handler)
 
   // Right-click menu on a directory row in the repo tree.
   ipcMain.handle('menu:tree', async (e) => {

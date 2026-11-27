@@ -311,6 +311,31 @@ section:focus { outline: none; }
   font-family: inherit;
 }
 #clone-url:focus { outline: 1px solid var(--accent); }
+.clone-field { display: flex; flex-direction: column; gap: 4px; }
+.clone-field label { font-size: 11px; color: var(--fg-dim); }
+#clone-dir-row { display: flex; gap: 6px; }
+#clone-dir, #clone-name {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--fg);
+  padding: 7px 9px;
+  font-size: 13px;
+  font-family: inherit;
+  min-width: 0;
+}
+#clone-dir { flex: 1; }
+#clone-dir:focus, #clone-name:focus { outline: 1px solid var(--accent); }
+#btn-clone-browse {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--fg);
+  padding: 0 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+#btn-clone-browse:hover { border-color: var(--accent); }
 #clone-hint { color: var(--fg-dim); font-size: 11px; line-height: 1.5; word-break: break-all; }
 #clone-btns { display: flex; gap: 8px; justify-content: flex-end; }
 #clone-btns button {

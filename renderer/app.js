@@ -1178,46 +1178,84 @@ $('btn-add').addEventListener('click', async () => {
 
 // ---------- clone ----------
 
-// Ask for a repository URL in the clone modal. Resolves with the URL, or
-// null when cancelled.
-function askCloneUrl(destDir) {
+// Ask for a repository URL, target directory and clone name in the clone
+// modal. Resolves with { url, dir, name }, or null when cancelled. The name
+// follows the URL until the user edits it.
+function askClone(destDir) {
   return new Promise((resolve) => {
     const modal = $('clone-modal');
     const input = $('clone-url');
-    $('clone-hint').textContent = destDir ? `Cloned into ${destDir}` : 'Cloned next to the first root and added to the tree.';
-    modal.hidden = false;
+    const dirInput = $('clone-dir');
+    const nameInput = $('clone-name');
+    const hint = $('clone-hint');
+    // Default directory: the given dir, or next to the first tree root.
+    let defaultDir = destDir;
+    if (!defaultDir && state.tree.length && state.tree[0].path) {
+      defaultDir = state.tree[0].path.replace(/[\\/]+$/, '').replace(/[\\/][^\\/]+$/, '');
+    }
+    dirInput.value = defaultDir || '';
     input.value = '';
+    nameInput.value = '';
+    let nameEdited = false;
+    const derivedName = () =>
+      input.value.trim().replace(/\/+$/, '').replace(/\.git$/, '').split('/').pop() || '';
+    const updateHint = () => {
+      const dir = dirInput.value.trim();
+      const name = nameInput.value.trim() || derivedName() || 'repo';
+      hint.textContent = dir ? `Cloning into ${dir}/${name}` : 'Cloning next to the first root and added to the tree.';
+    };
+    updateHint();
+    modal.hidden = false;
     input.focus();
     const done = (val) => {
       modal.hidden = true;
       $('btn-clone-ok').removeEventListener('click', onOk);
       $('btn-clone-cancel').removeEventListener('click', onCancel);
+      $('btn-clone-browse').removeEventListener('click', onBrowse);
       modal.removeEventListener('mousedown', onBackdrop);
-      input.removeEventListener('keydown', onKey);
+      for (const el of [input, dirInput, nameInput]) el.removeEventListener('keydown', onKey);
+      input.removeEventListener('input', onUrlInput);
+      nameInput.removeEventListener('input', onNameInput);
+      dirInput.removeEventListener('input', updateHint);
       resolve(val);
     };
     const submit = () => {
       const url = input.value.trim();
       if (!url) { input.focus(); return; }
-      done(url);
+      done({ url, dir: dirInput.value.trim() || null, name: nameInput.value.trim() || null });
     };
     const onOk = () => submit();
     const onCancel = () => done(null);
+    const onBrowse = async () => {
+      const d = await api.pickFolder();
+      if (d) { dirInput.value = d; updateHint(); }
+    };
     const onBackdrop = (e) => { if (e.target === modal) done(null); };
+    const onUrlInput = () => {
+      if (!nameEdited) nameInput.value = derivedName();
+      updateHint();
+    };
+    const onNameInput = () => { nameEdited = true; updateHint(); };
     const onKey = (e) => {
       if (e.key === 'Enter') submit();
       if (e.key === 'Escape') done(null);
     };
     $('btn-clone-ok').addEventListener('click', onOk);
     $('btn-clone-cancel').addEventListener('click', onCancel);
+    $('btn-clone-browse').addEventListener('click', onBrowse);
     modal.addEventListener('mousedown', onBackdrop);
     input.addEventListener('keydown', onKey);
+    dirInput.addEventListener('keydown', onKey);
+    nameInput.addEventListener('keydown', onKey);
+    input.addEventListener('input', onUrlInput);
+    nameInput.addEventListener('input', onNameInput);
+    dirInput.addEventListener('input', updateHint);
   });
 }
 
-async function cloneInto(url, destParent) {
+async function cloneInto(url, destParent, name, addRoot) {
   setResult(`Cloning ${url}…`);
-  const r = await api.clone(url, destParent);
+  const r = await api.clone(url, destParent, name, addRoot);
   if (r.ok) {
     setResult(`Cloned ${url} into ${r.path}.`);
     await fullRefresh({ keepSelection: false });
@@ -1227,9 +1265,9 @@ async function cloneInto(url, destParent) {
 }
 
 $('btn-clone').addEventListener('click', async () => {
-  const url = await askCloneUrl(null);
-  if (!url) return;
-  await cloneInto(url, null); // main picks the destination: next to the first root
+  const r = await askClone(null);
+  if (!r) return;
+  await cloneInto(r.url, r.dir, r.name, true); // toolbar clone is added as a tree root
 });
 
 // Right-click on a directory row in the tree: clone a repository into it.
@@ -1240,9 +1278,9 @@ $('tree').addEventListener('contextmenu', async (ev) => {
   const dir = row.dataset.dir;
   const act = await api.menuTree(dir);
   if (act !== 'clone') return;
-  const url = await askCloneUrl(dir);
-  if (!url) return;
-  await cloneInto(url, dir);
+  const r = await askClone(dir);
+  if (!r) return;
+  await cloneInto(r.url, r.dir || dir, r.name, false);
 });
 
 $('btn-refresh').addEventListener('click', () => fullRefresh());
