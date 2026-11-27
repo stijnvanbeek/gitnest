@@ -1169,7 +1169,8 @@ async function runAction(label, fn) {
 $('btn-add').addEventListener('click', async () => {
   const folder = await api.pickFolder();
   if (!folder) return;
-  await api.addRoot(folder);
+  const r = await api.addRoot(folder);
+  if (r && r.ok === false) { setResult(r.error, true); return; }
   await fullRefresh({ keepSelection: false });
 });
 

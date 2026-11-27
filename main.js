@@ -145,10 +145,22 @@ function registerHandlers() {
   ipcMain.handle('config:get', () => readConfig());
 
   ipcMain.handle('roots:add', async (e, p) => {
+    // Only folders that are a git repo themselves or contain one (nested, up
+    // to 5 levels deep) can be added as a root; anything else would only
+    // ever show an empty, unselectable tree.
+    let found = [];
+    try {
+      found = await git.findRepos(p);
+    } catch {
+      found = [];
+    }
+    if (!found.length) {
+      return { ok: false, error: `"${p}" contains no git repository: the folder itself is not a repo and no nested repo was found inside.` };
+    }
     const cfg = await readConfig();
     if (!cfg.roots.includes(p)) cfg.roots.push(p);
     await writeConfig(cfg);
-    return cfg.roots;
+    return { ok: true, roots: cfg.roots };
   });
 
   ipcMain.handle('repos:remove', async (e, p) => {
