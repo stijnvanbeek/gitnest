@@ -336,6 +336,17 @@ section:focus { outline: none; }
   cursor: pointer;
 }
 #btn-clone-browse:hover { border-color: var(--accent); }
+#clone-btns[hidden] { display: none; }
+#clone-progress[hidden] { display: none; }
+#clone-progress-label { font-size: 11px; color: var(--fg-dim); word-break: break-all; }
+#clone-progress-bar {
+  height: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+#clone-progress-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s; }
 #clone-hint { color: var(--fg-dim); font-size: 11px; line-height: 1.5; word-break: break-all; }
 #clone-btns { display: flex; gap: 8px; justify-content: flex-end; }
 #clone-btns button {

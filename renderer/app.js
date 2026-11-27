@@ -1253,11 +1253,50 @@ function askClone(destDir) {
   });
 }
 
-async function cloneInto(url, destParent, name, addRoot) {
-  setResult(`Cloning ${url}…`);
-  const r = await api.clone(url, destParent, name, addRoot);
+// Run the clone with the modal switched to progress mode: fields and buttons
+// hidden, a progress bar fed by git's --progress output until it finishes.
+// Stages are weighted into one overall percentage.
+const CLONE_STAGE_WEIGHTS = {
+  'Counting objects': [0, 5],
+  'Compressing objects': [5, 10],
+  'Receiving objects': [10, 85],
+  'Resolving deltas': [85, 95],
+  'Updating files': [95, 100],
+};
+
+async function runCloneWithProgress(spec, addRoot) {
+  const modal = $('clone-modal');
+  const fields = $('clone-fields');
+  const btns = $('clone-btns');
+  const prog = $('clone-progress');
+  const fill = $('clone-progress-fill');
+  const label = $('clone-progress-label');
+  fields.hidden = true;
+  btns.hidden = true;
+  prog.hidden = false;
+  fill.style.width = '0%';
+  label.textContent = 'Starting clone…';
+  const off = api.onCloneProgress((d) => {
+    const w = CLONE_STAGE_WEIGHTS[d.stage];
+    if (w) fill.style.width = `${Math.round(w[0] + (w[1] - w[0]) * d.pct / 100)}%`;
+    if (d.text) label.textContent = d.text;
+  });
+  try {
+    return await api.clone(spec.url, spec.dir, spec.name, addRoot);
+  } finally {
+    off();
+    prog.hidden = true;
+    fields.hidden = false;
+    btns.hidden = false;
+    modal.hidden = true;
+  }
+}
+
+async function cloneInto(spec, addRoot) {
+  setResult(`Cloning ${spec.url}…`);
+  const r = await runCloneWithProgress(spec, addRoot);
   if (r.ok) {
-    setResult(`Cloned ${url} into ${r.path}.`);
+    setResult(`Cloned ${spec.url} into ${r.path}.`);
     await fullRefresh({ keepSelection: false });
   } else {
     setResult(`Clone failed:\n${r.error || ''}`, true);
@@ -1267,7 +1306,7 @@ async function cloneInto(url, destParent, name, addRoot) {
 $('btn-clone').addEventListener('click', async () => {
   const r = await askClone(null);
   if (!r) return;
-  await cloneInto(r.url, r.dir, r.name, true); // toolbar clone is added as a tree root
+  await cloneInto(r, true); // toolbar clone is added as a tree root
 });
 
 // Right-click on a directory row in the tree: clone a repository into it.
@@ -1280,7 +1319,7 @@ $('tree').addEventListener('contextmenu', async (ev) => {
   if (act !== 'clone') return;
   const r = await askClone(dir);
   if (!r) return;
-  await cloneInto(r.url, r.dir || dir, r.name, false);
+  await cloneInto({ ...r, dir: r.dir || dir }, false);
 });
 
 $('btn-refresh').addEventListener('click', () => fullRefresh());

@@ -7,6 +7,11 @@ contextBridge.exposeInMainWorld('gitnest', {
   removeRepo: (p) => ipcRenderer.invoke('repos:remove', p),
   pickFolder: () => ipcRenderer.invoke('dialog:pickFolder'),
   clone: (url, destParent, name, addRoot) => ipcRenderer.invoke('repos:clone', url, destParent, name, addRoot),
+  onCloneProgress: (cb) => {
+    const h = (e, d) => cb(d);
+    ipcRenderer.on('clone:progress', h);
+    return () => ipcRenderer.removeListener('clone:progress', h);
+  },
   menuTree: () => ipcRenderer.invoke('menu:tree'),
   scan: () => ipcRenderer.invoke('repos:scan'),
   statuses: (paths) => ipcRenderer.invoke('repos:statuses', paths),

@@ -193,7 +193,8 @@ function registerHandlers() {
       }
       dest = path.dirname(path.resolve(cfg.roots[0]));
     }
-    const r = await git.cloneRepo(url, dest, name);
+    const onProgress = (d) => { if (!e.sender.isDestroyed()) e.sender.send('clone:progress', d); };
+    const r = await git.cloneRepo(url, dest, name, onProgress);
     if (r.ok && addRoot) {
       const cfg = await readConfig();
       if (!cfg.roots.includes(r.path)) cfg.roots.push(r.path);

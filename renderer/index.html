@@ -103,17 +103,23 @@
   <div id="clone-modal" hidden>
     <div id="clone-box">
       <div id="clone-title">Clone repository</div>
-      <input id="clone-url" type="text" placeholder="https://github.com/user/repo.git" spellcheck="false">
-      <div class="clone-field"><label>Directory</label>
-        <div id="clone-dir-row">
-          <input id="clone-dir" type="text" spellcheck="false">
-          <button id="btn-clone-browse" title="Choose a directory">…</button>
+      <div id="clone-fields">
+        <input id="clone-url" type="text" placeholder="https://github.com/user/repo.git" spellcheck="false">
+        <div class="clone-field"><label>Directory</label>
+          <div id="clone-dir-row">
+            <input id="clone-dir" type="text" spellcheck="false">
+            <button id="btn-clone-browse" title="Choose a directory">…</button>
+          </div>
         </div>
+        <div class="clone-field"><label>Name</label>
+          <input id="clone-name" type="text" spellcheck="false" placeholder="repo-name">
+        </div>
+        <div id="clone-hint"></div>
       </div>
-      <div class="clone-field"><label>Name</label>
-        <input id="clone-name" type="text" spellcheck="false" placeholder="repo-name">
+      <div id="clone-progress" hidden>
+        <div id="clone-progress-label">Starting clone…</div>
+        <div id="clone-progress-bar"><div id="clone-progress-fill"></div></div>
       </div>
-      <div id="clone-hint"></div>
       <div id="clone-btns">
         <button id="btn-clone-cancel">Cancel</button>
         <button id="btn-clone-ok" class="primary">Clone</button>
