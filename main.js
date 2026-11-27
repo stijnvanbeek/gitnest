@@ -344,6 +344,8 @@ function createWindow() {
     },
   });
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  // default UI scaling: everything 10% larger than the CSS pixel sizes
+  win.webContents.on('did-finish-load', () => win.webContents.setZoomFactor(1.1));
   win.on('closed', () => { win = null; });
 }
 
