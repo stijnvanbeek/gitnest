@@ -571,12 +571,12 @@ function renderTreeNodes(container, nodes, depth) {
           return;
         }
         selectRepo(node.path);
-      } else if (node.children && node.children.length) {
-        // non-repo root: toggle its first repo's expansion via key on the root path
+      } else {
+        // non-repo root (a plain folder added as a root): selectable like a
+        // repo row, so clicking it is never a dead click. Its children, if
+        // any, are always shown.
         state.lastRepoClick = null;
-        const key = `root:${node.path}`;
-        if (state.expanded.has(key)) state.expanded.delete(key); else state.expanded.add(key);
-        renderTree();
+        selectRepo(node.path);
       }
     });
 
