@@ -145,6 +145,7 @@ function registerHandlers() {
   ipcMain.handle('config:get', () => readConfig());
 
   ipcMain.handle('roots:add', async (e, p) => {
+    p = path.resolve(p); // pickers may hand back trailing slashes etc.
     // Only folders that are a git repo themselves or contain one (nested, up
     // to 5 levels deep) can be added as a root; anything else would only
     // ever show an empty, unselectable tree.
@@ -163,11 +164,14 @@ function registerHandlers() {
     return { ok: true, roots: cfg.roots };
   });
 
-  ipcMain.handle('repos:remove', async (e, p) => {
+  ipcMain.handle('repos:remove', async (e, pRaw) => {
+    const p = path.resolve(pRaw); // must match how the root was stored
     const cfg = await readConfig();
     if (cfg.roots.includes(p)) {
-      // a configured root: drop it from the list entirely
+      // a configured root: drop it from the list entirely (and clear any
+      // stale exclusion of it, so re-adding the same folder works)
       cfg.roots = cfg.roots.filter((r) => r !== p);
+      if (Array.isArray(cfg.excluded)) cfg.excluded = cfg.excluded.filter((x) => x !== p);
     } else {
       // a nested repo: keep the root, hide this repo (and its nested repos)
       if (!Array.isArray(cfg.excluded)) cfg.excluded = [];
