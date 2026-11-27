@@ -279,6 +279,52 @@ section:focus { outline: none; }
 .settings-btns { display: flex; gap: 8px; }
 .settings-hint { color: var(--fg-dim); font-size: 11px; line-height: 1.5; }
 
+/* clone modal: ask for a repository URL */
+#clone-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+#clone-modal[hidden] { display: none; }
+#clone-box {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px 20px;
+  width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+#clone-title { font-weight: 700; font-size: 14px; color: var(--accent); }
+#clone-url {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--fg);
+  padding: 7px 9px;
+  font-size: 13px;
+  font-family: inherit;
+}
+#clone-url:focus { outline: 1px solid var(--accent); }
+#clone-hint { color: var(--fg-dim); font-size: 11px; line-height: 1.5; word-break: break-all; }
+#clone-btns { display: flex; gap: 8px; justify-content: flex-end; }
+#clone-btns button {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--fg);
+  padding: 5px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+#clone-btns button.primary { border-color: var(--accent); color: var(--accent); }
+#clone-btns button:hover { background: var(--bg-alt); }
+
 #selection-info {
   padding: 4px 12px 0;
   color: var(--fg-dim);

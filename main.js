@@ -181,6 +181,39 @@ function registerHandlers() {
     return cfg;
   });
 
+  ipcMain.handle('repos:clone', async (e, url, destParent) => {
+    // Toolbar clone: no destination given, clone next to the first root and
+    // add the clone as a tree root. Clone-here: destParent is the selected
+    // directory; the clone shows up nested inside it on the next scan.
+    let dest = destParent;
+    if (!dest) {
+      const cfg = await readConfig();
+      if (!cfg.roots.length) {
+        return { ok: false, error: 'Add a repository first: there is no root folder to clone next to.' };
+      }
+      dest = path.dirname(path.resolve(cfg.roots[0]));
+    }
+    const r = await git.cloneRepo(url, dest);
+    if (r.ok && !destParent) {
+      const cfg = await readConfig();
+      if (!cfg.roots.includes(r.path)) cfg.roots.push(r.path);
+      await writeConfig(cfg);
+    }
+    return r;
+  });
+
+  // Right-click menu on a directory row in the repo tree.
+  ipcMain.handle('menu:tree', async (e) => {
+    let picked = null;
+    const menu = Menu.buildFromTemplate([
+      { label: 'Clone here…', click: () => { picked = 'clone'; } },
+    ]);
+    return await new Promise((resolve) => {
+      menu.on('menu-will-close', () => setTimeout(() => resolve(picked), 0));
+      menu.popup({ window: BrowserWindow.fromWebContents(e.sender) });
+    });
+  });
+
   ipcMain.handle('dialog:pickFolder', async () => {
     const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
     return r.canceled ? null : r.filePaths[0];

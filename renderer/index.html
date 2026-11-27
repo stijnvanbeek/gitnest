@@ -10,6 +10,7 @@
   <header id="toolbar">
     <div id="app-title">GitNest</div>
     <button id="btn-add" class="icon-btn" title="Add a repository folder to the tree">+</button>
+    <button id="btn-clone" class="icon-btn" title="Clone a repository by URL and add it to the tree">⤓</button>
     <button id="btn-remove" class="icon-btn" title="Remove the selected repository from the tree">−</button>
     <button id="btn-refresh" class="icon-btn" title="Re-scan and refresh all statuses">⟳</button>
     <span id="scan-indicator"></span>
@@ -95,6 +96,18 @@
       <div class="settings-hint">
         Double-click a file in the tree or in the changes list to open it in this editor.
         "Use default" opens files with the operating system's default application.
+      </div>
+    </div>
+  </div>
+
+  <div id="clone-modal" hidden>
+    <div id="clone-box">
+      <div id="clone-title">Clone repository</div>
+      <input id="clone-url" type="text" placeholder="https://github.com/user/repo.git" spellcheck="false">
+      <div id="clone-hint"></div>
+      <div id="clone-btns">
+        <button id="btn-clone-cancel">Cancel</button>
+        <button id="btn-clone-ok" class="primary">Clone</button>
       </div>
     </div>
   </div>

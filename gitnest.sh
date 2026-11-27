@@ -1,1 +1,1 @@
-npm start
+npx electron . --no-sandbox

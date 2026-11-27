@@ -414,6 +414,7 @@ function renderFileTree(container, node, repoPath, prefix, depth) {
     const key = `${repoPath}::${prefix}${dir}`;
     const row = document.createElement('div');
     row.className = 'tree-row';
+    row.dataset.dir = `${repoPath}/${prefix}${dir}`;
     row.style.paddingLeft = `${8 + depth * 14}px`;
     const isOpen = state.expanded.has(key);
     row.innerHTML = `<span class="tree-caret ${isOpen ? 'expanded' : ''}">▶</span>
@@ -509,6 +510,7 @@ function renderTreeNodes(container, nodes, depth) {
   for (const node of nodes) {
     const row = document.createElement('div');
     row.className = 'tree-row';
+    row.dataset.dir = node.path; // every node here is a directory
     if (node.path === state.selected) row.classList.add('selected');
     row.style.paddingLeft = `${8 + depth * 14}px`;
 
@@ -1172,6 +1174,75 @@ $('btn-add').addEventListener('click', async () => {
   const r = await api.addRoot(folder);
   if (r && r.ok === false) { setResult(r.error, true); return; }
   await fullRefresh({ keepSelection: false });
+});
+
+// ---------- clone ----------
+
+// Ask for a repository URL in the clone modal. Resolves with the URL, or
+// null when cancelled.
+function askCloneUrl(destDir) {
+  return new Promise((resolve) => {
+    const modal = $('clone-modal');
+    const input = $('clone-url');
+    $('clone-hint').textContent = destDir ? `Cloned into ${destDir}` : 'Cloned next to the first root and added to the tree.';
+    modal.hidden = false;
+    input.value = '';
+    input.focus();
+    const done = (val) => {
+      modal.hidden = true;
+      $('btn-clone-ok').removeEventListener('click', onOk);
+      $('btn-clone-cancel').removeEventListener('click', onCancel);
+      modal.removeEventListener('mousedown', onBackdrop);
+      input.removeEventListener('keydown', onKey);
+      resolve(val);
+    };
+    const submit = () => {
+      const url = input.value.trim();
+      if (!url) { input.focus(); return; }
+      done(url);
+    };
+    const onOk = () => submit();
+    const onCancel = () => done(null);
+    const onBackdrop = (e) => { if (e.target === modal) done(null); };
+    const onKey = (e) => {
+      if (e.key === 'Enter') submit();
+      if (e.key === 'Escape') done(null);
+    };
+    $('btn-clone-ok').addEventListener('click', onOk);
+    $('btn-clone-cancel').addEventListener('click', onCancel);
+    modal.addEventListener('mousedown', onBackdrop);
+    input.addEventListener('keydown', onKey);
+  });
+}
+
+async function cloneInto(url, destParent) {
+  setResult(`Cloning ${url}…`);
+  const r = await api.clone(url, destParent);
+  if (r.ok) {
+    setResult(`Cloned ${url} into ${r.path}.`);
+    await fullRefresh({ keepSelection: false });
+  } else {
+    setResult(`Clone failed:\n${r.error || ''}`, true);
+  }
+}
+
+$('btn-clone').addEventListener('click', async () => {
+  const url = await askCloneUrl(null);
+  if (!url) return;
+  await cloneInto(url, null); // main picks the destination: next to the first root
+});
+
+// Right-click on a directory row in the tree: clone a repository into it.
+$('tree').addEventListener('contextmenu', async (ev) => {
+  const row = ev.target.closest('.tree-row');
+  if (!row || !row.dataset.dir) return;
+  ev.preventDefault();
+  const dir = row.dataset.dir;
+  const act = await api.menuTree(dir);
+  if (act !== 'clone') return;
+  const url = await askCloneUrl(dir);
+  if (!url) return;
+  await cloneInto(url, dir);
 });
 
 $('btn-refresh').addEventListener('click', () => fullRefresh());

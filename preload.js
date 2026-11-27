@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('gitnest', {
   addRoot: (p) => ipcRenderer.invoke('roots:add', p),
   removeRepo: (p) => ipcRenderer.invoke('repos:remove', p),
   pickFolder: () => ipcRenderer.invoke('dialog:pickFolder'),
+  clone: (url, destParent) => ipcRenderer.invoke('repos:clone', url, destParent),
+  menuTree: () => ipcRenderer.invoke('menu:tree'),
   scan: () => ipcRenderer.invoke('repos:scan'),
   statuses: (paths) => ipcRenderer.invoke('repos:statuses', paths),
   status: (repo) => ipcRenderer.invoke('repo:status', repo),
