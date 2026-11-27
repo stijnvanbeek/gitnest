@@ -1273,6 +1273,7 @@ async function runCloneWithProgress(spec, addRoot) {
   const label = $('clone-progress-label');
   fields.hidden = true;
   btns.hidden = true;
+  modal.hidden = false; // askClone hid it when it resolved; the bar shows in the modal
   prog.hidden = false;
   fill.style.width = '0%';
   label.textContent = 'Starting clone…';
